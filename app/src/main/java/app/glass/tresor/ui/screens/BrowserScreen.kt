@@ -3,18 +3,17 @@ package app.glass.tresor.ui.screens
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.net.Uri
+import android.view.View
 import android.webkit.CookieManager
 import android.webkit.URLUtil
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -42,6 +41,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -49,12 +49,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -84,6 +90,13 @@ import java.net.URL
 
 private const val SEARCH = "https://duckduckgo.com/?q="
 
+private val quickLinks = listOf(
+    Bookmark("DuckDuckGo", "https://duckduckgo.com"),
+    Bookmark("Wikipedia", "https://de.wikipedia.org"),
+    Bookmark("ORF", "https://orf.at"),
+    Bookmark("Wetter", "https://www.wetter.com"),
+)
+
 /** Eingabe → Adresse: echte Adresse direkt, sonst Suche. */
 private fun toUrl(input: String): String {
     val t = input.trim()
@@ -92,28 +105,41 @@ private fun toUrl(input: String): String {
     return SEARCH + Uri.encode(t)
 }
 
+private fun hostOf(url: String): String = try {
+    Uri.parse(url).host?.removePrefix("www.") ?: url
+} catch (e: Exception) {
+    url
+}
+
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun BrowserScreen() {
     val vault = App.vault ?: return
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
-    var address by remember { mutableStateOf("") }
+    val focus = LocalFocusManager.current
+
+    var input by remember { mutableStateOf("") }
+    var editing by remember { mutableStateOf(false) }
     var currentUrl by remember { mutableStateOf("") }
     var title by remember { mutableStateOf("") }
     var progress by remember { mutableFloatStateOf(1f) }
     var started by remember { mutableStateOf(false) }
     var canBack by remember { mutableStateOf(false) }
     var canForward by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
     var bookmarks by remember { mutableStateOf(BrowserData.bookmarks(vault)) }
     var showBookmarks by remember { mutableStateOf(false) }
-    var downloading by remember { mutableStateOf(0) }
+    var downloads by remember { mutableIntStateOf(0) }
+    val fieldFocus = remember { FocusRequester() }
 
     BrowserData.used = true
 
     val web = remember {
         WebView(ctx).apply {
-            setBackgroundColor(android.graphics.Color.parseColor("#07080C"))
+            setBackgroundColor(android.graphics.Color.WHITE)
+            // Die Webseite soll dem Adressfeld nicht den Fokus wegnehmen
+            isFocusableInTouchMode = true
             settings.apply {
                 javaScriptEnabled = true
                 domStorageEnabled = true
@@ -124,6 +150,8 @@ fun BrowserScreen() {
                 mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
                 builtInZoomControls = true
                 displayZoomControls = false
+                loadWithOverviewMode = true
+                useWideViewPort = true
                 setSupportMultipleWindows(false)
                 mediaPlaybackRequiresUserGesture = true
             }
@@ -137,13 +165,21 @@ fun BrowserScreen() {
                 }
 
                 override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
-                    currentUrl = url; address = url
+                    if (url == "about:blank") return
+                    currentUrl = url; error = null
                     canBack = view.canGoBack(); canForward = view.canGoForward()
                 }
 
                 override fun onPageFinished(view: WebView, url: String) {
-                    currentUrl = url; address = url; title = view.title ?: ""
+                    if (url == "about:blank") return
+                    currentUrl = url; title = view.title ?: ""
                     canBack = view.canGoBack(); canForward = view.canGoForward()
+                }
+
+                override fun onReceivedError(view: WebView, request: WebResourceRequest, err: WebResourceError) {
+                    if (request.isForMainFrame) {
+                        error = "Seite konnte nicht geladen werden (${err.description}).\nIst die Berechtigung „Netzwerk“ für die App erlaubt?"
+                    }
                 }
             }
             webChromeClient = object : WebChromeClient() {
@@ -154,7 +190,7 @@ fun BrowserScreen() {
             // Downloads landen direkt verschlüsselt im Tresor-Ordner „Downloads“
             setDownloadListener { url, userAgent, contentDisposition, mimetype, _ ->
                 val name = URLUtil.guessFileName(url, contentDisposition, mimetype)
-                downloading++
+                downloads++
                 App.toast("Lade „$name“ verschlüsselt …")
                 scope.launch {
                     val ok = withContext(Dispatchers.IO) {
@@ -178,7 +214,7 @@ fun BrowserScreen() {
                             false
                         }
                     }
-                    downloading--
+                    downloads--
                     App.toast(if (ok) "„$name“ liegt verschlüsselt in Dateien → Downloads" else "Download fehlgeschlagen")
                 }
             }
@@ -194,76 +230,159 @@ fun BrowserScreen() {
         }
     }
 
-    fun go(input: String) {
-        if (input.isBlank()) return
+    fun go(text: String) {
+        if (text.isBlank()) return
+        val url = toUrl(text)
         started = true
-        web.loadUrl(toUrl(input))
+        error = null
+        editing = false
+        focus.clearFocus()
+        currentUrl = url
+        web.loadUrl(url)
     }
 
-    BackHandler(enabled = started) {
-        if (web.canGoBack()) web.goBack() else {
-            started = false; address = ""; title = ""
-            web.loadUrl("about:blank")
+    fun home() {
+        web.stopLoading()
+        started = false
+        title = ""; currentUrl = ""; input = ""; error = null
+        web.loadUrl("about:blank")
+        web.clearHistory()
+        canBack = false; canForward = false
+    }
+
+    BackHandler(enabled = started || editing) {
+        when {
+            editing -> { editing = false; focus.clearFocus() }
+            web.canGoBack() -> web.goBack()
+            else -> home()
         }
     }
 
-    val isBookmarked = bookmarks.any { it.url == currentUrl }
+    val isBookmarked = currentUrl.isNotEmpty() && bookmarks.any { it.url == currentUrl }
 
     GlassBackground {
         Column(Modifier.fillMaxSize().imePadding()) {
-            // Adressleiste
+            // Obere Leiste: schließen + Seitentitel
             Row(
-                Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 16.dp).padding(top = 12.dp),
+                Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 16.dp).padding(top = 12.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 GlassIconButton(Ic.close, "Browser schließen") { App.nav.pop() }
-                Spacer(Modifier.width(8.dp))
-                Row(
-                    Modifier.weight(1f).height(44.dp).glass(Pill).padding(horizontal = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(if (currentUrl.startsWith("https://") || !started) Ic.lock else Ic.search, null, tint = G.dim, modifier = Modifier.size(15.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Box(Modifier.weight(1f)) {
-                        if (address.isEmpty()) Text("Suchen oder Adresse", style = G.body.copy(fontSize = 15.sp, color = G.faint))
-                        BasicTextField(
-                            value = address, onValueChange = { address = it }, singleLine = true,
-                            textStyle = G.body.copy(fontSize = 15.sp), cursorBrush = SolidColor(G.accentText),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go, autoCorrectEnabled = false),
-                            keyboardActions = KeyboardActions(onGo = { go(address) }),
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    if (started) title.ifBlank { hostOf(currentUrl) } else "Privater Browser",
+                    style = G.headline.copy(fontSize = 16.sp), maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                if (downloads > 0) Text("⬇ $downloads", style = G.footnote)
+            }
+
+            // Inhalt: Webseite oder Startseite
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+                AndroidView(
+                    factory = { web },
+                    update = { it.visibility = if (started) View.VISIBLE else View.GONE },
+                    modifier = Modifier.fillMaxSize()
+                )
+                if (!started) {
+                    StartPage(bookmarks, onOpen = { go(it.url) }, onSearch = {
+                        editing = true
+                        try { fieldFocus.requestFocus() } catch (_: Exception) {}
+                    })
+                }
+                val err = error
+                if (started && err != null) {
+                    Column(
+                        Modifier.fillMaxSize().background(G.bg).padding(32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(Ic.globe, null, tint = G.dim, modifier = Modifier.size(42.dp))
+                        Spacer(Modifier.height(12.dp))
+                        Text(err, style = G.callout.copy(color = G.dim), textAlign = TextAlign.Center)
+                        Spacer(Modifier.height(16.dp))
+                        app.glass.tresor.ui.PillButton("Erneut versuchen", height = 44.dp) { error = null; web.reload() }
+                    }
+                }
+                // Ladebalken
+                val shown by animateFloatAsState(if (progress < 1f && started) 1f else 0f, label = "prog")
+                if (shown > 0f) {
+                    Box(
+                        Modifier.align(Alignment.TopStart).fillMaxWidth(progress.coerceIn(0.05f, 1f)).height(3.dp)
+                            .background(G.accent.copy(alpha = shown))
+                    )
+                }
+            }
+
+            // Adressleiste unten (wie Safari)
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 10.dp)
+                    .height(50.dp)
+                    .pressable(Pill, haptic = Haptic.NONE, highlight = 0.06f) {
+                        editing = true
+                        try { fieldFocus.requestFocus() } catch (_: Exception) {}
+                    }
+                    .glass(Pill, G.fillStrong)
+                    .padding(start = 18.dp, end = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(if (!editing && currentUrl.startsWith("https://")) Ic.lock else Ic.search, null, tint = G.dim, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(10.dp))
+                Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                    val shownText = if (editing) input else if (started) hostOf(currentUrl) else ""
+                    if (shownText.isEmpty()) Text("Suchen oder Adresse eingeben", style = G.body.copy(fontSize = 16.sp, color = G.faint))
+                    BasicTextField(
+                        value = shownText,
+                        onValueChange = { input = it; editing = true },
+                        singleLine = true,
+                        textStyle = G.body.copy(fontSize = 16.sp, fontWeight = if (editing) FontWeight.Normal else FontWeight.Medium),
+                        cursorBrush = SolidColor(G.accentText),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go, autoCorrectEnabled = false),
+                        keyboardActions = KeyboardActions(onGo = { go(input) }, onDone = { go(input) }, onSearch = { go(input) }),
+                        modifier = Modifier.fillMaxWidth()
+                            .focusRequester(fieldFocus)
+                            .onFocusChanged {
+                                if (it.isFocused && !editing) {
+                                    editing = true
+                                    input = if (started) currentUrl else ""
+                                }
+                            }
+                    )
+                }
+                if (editing && input.isNotEmpty()) {
+                    Box(Modifier.size(36.dp).pressable(CircleShape, haptic = Haptic.NONE) { input = "" }, contentAlignment = Alignment.Center) {
+                        Icon(Ic.close, "Leeren", tint = G.dim, modifier = Modifier.size(16.dp))
+                    }
+                    Spacer(Modifier.width(4.dp))
+                    Box(
+                        Modifier.height(38.dp).pressable(Pill, highlight = 0f, haptic = Haptic.CONFIRM) { go(input) }
+                            .clip(Pill).background(G.accent).padding(horizontal = 16.dp),
+                        contentAlignment = Alignment.Center
+                    ) { Text("Los", style = G.headline.copy(fontSize = 15.sp)) }
+                } else if (started) {
+                    Box(Modifier.size(38.dp).pressable(CircleShape) { web.reload() }, contentAlignment = Alignment.Center) {
+                        Icon(Ic.refresh, "Neu laden", tint = Color.White, modifier = Modifier.size(18.dp))
                     }
                 }
             }
-            val shown by animateFloatAsState(if (progress < 1f && started) 1f else 0f, label = "prog")
-            Box(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp).height(2.dp)) {
-                if (shown > 0f) Box(Modifier.fillMaxWidth(progress.coerceIn(0.05f, 1f)).height(2.dp).clip(Pill).background(G.accent.copy(alpha = shown)))
-            }
 
-            Box(Modifier.weight(1f).fillMaxWidth()) {
-                AndroidView({ web }, Modifier.fillMaxSize())
-                if (!started) StartPage(bookmarks, onOpen = { go(it.url) })
-            }
-
-            // Untere Leiste
+            // Werkzeugleiste
             Row(
-                Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 24.dp, vertical = 10.dp)
-                    .height(56.dp).glass(Pill, G.fillStrong).padding(horizontal = 6.dp),
+                Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 24.dp, vertical = 8.dp).height(48.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                BarIcon(Ic.back, "Zurück", canBack) { web.goBack() }
+                BarIcon(Ic.back, "Zurück", started) { if (web.canGoBack()) web.goBack() else home() }
                 BarIcon(Ic.forward, "Vor", canForward) { web.goForward() }
-                BarIcon(Ic.refresh, "Neu laden", started) { web.reload() }
                 BarIcon(if (isBookmarked) Ic.check else Ic.plus, if (isBookmarked) "Lesezeichen entfernen" else "Lesezeichen speichern", started && currentUrl.startsWith("http")) {
                     bookmarks = if (isBookmarked) bookmarks.filterNot { it.url == currentUrl }
-                    else bookmarks + Bookmark(title.ifBlank { currentUrl }, currentUrl)
+                    else bookmarks + Bookmark(title.ifBlank { hostOf(currentUrl) }, currentUrl)
                     val list = bookmarks
                     scope.launch(Dispatchers.IO) { BrowserData.saveBookmarks(vault, list) }
                     App.toast(if (isBookmarked) "Lesezeichen entfernt" else "Lesezeichen verschlüsselt gespeichert")
                 }
                 BarIcon(Ic.note, "Lesezeichen", true) { showBookmarks = true }
+                BarIcon(Ic.grid, "Startseite", started) { home() }
             }
         }
 
@@ -292,36 +411,51 @@ fun BrowserScreen() {
 }
 
 @Composable
-private fun StartPage(bookmarks: List<Bookmark>, onOpen: (Bookmark) -> Unit) {
+private fun StartPage(bookmarks: List<Bookmark>, onOpen: (Bookmark) -> Unit, onSearch: () -> Unit) {
     Column(
-        Modifier.fillMaxSize().background(G.bg).verticalScroll(rememberScrollState()).padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("Privater Browser", style = G.largeTitle)
+        // Großes Suchfeld – antippen öffnet die Tastatur in der Adressleiste
+        Row(
+            Modifier.fillMaxWidth().height(56.dp).pressable(Pill, haptic = Haptic.TICK, onClick = onSearch)
+                .glass(Pill, G.fillStrong).padding(horizontal = 20.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Ic.search, null, tint = G.dim, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(12.dp))
+            Text("Suchen oder Adresse eingeben", style = G.body.copy(color = G.faint))
+        }
+
+        Text("FAVORITEN", style = G.caption, modifier = Modifier.padding(start = 4.dp, top = 4.dp))
+        val all = (bookmarks + quickLinks).distinctBy { it.url }.take(12)
+        all.chunked(4).forEach { row ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                row.forEach { b ->
+                    Column(
+                        Modifier.weight(1f).pressable(sq(18)) { onOpen(b) }.padding(vertical = 6.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Box(
+                            Modifier.size(58.dp).glass(sq(16)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(b.title.take(1).uppercase(), style = G.title3)
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        Text(b.title, style = G.footnote.copy(color = Color.White), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+                repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+
         Row(Modifier.fillMaxWidth().glass(sq(22)).padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Ic.shield, null, tint = G.mint, modifier = Modifier.size(26.dp))
             Spacer(Modifier.width(12.dp))
             Column {
                 Text("Kein Verlauf, keine Spuren", style = G.headline.copy(fontSize = 15.sp))
                 Text("Cookies und Website-Daten werden beim Sperren gelöscht. Downloads landen verschlüsselt im Tresor.", style = G.footnote)
-            }
-        }
-        if (bookmarks.isNotEmpty()) {
-            Text("LESEZEICHEN", style = G.caption, modifier = Modifier.padding(start = 4.dp, top = 6.dp))
-            bookmarks.forEach { b ->
-                Row(
-                    Modifier.fillMaxWidth().pressable(sq(18)) { onOpen(b) }.glass(sq(18)).padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(Modifier.size(34.dp).clip(CircleShape).background(G.blue), contentAlignment = Alignment.Center) {
-                        Text(b.title.take(1).uppercase(), style = G.headline.copy(fontSize = 15.sp))
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(b.title, style = G.body.copy(fontSize = 15.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(Uri.parse(b.url).host ?: b.url, style = G.footnote, maxLines = 1)
-                    }
-                }
             }
         }
         Text(
