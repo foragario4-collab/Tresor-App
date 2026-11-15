@@ -1,0 +1,15 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- Glas-Tresortür (Logo Nr. 42), Entwurf im 200er Raster, skaliert in die sichere Zone -->
+    <group android:scaleX="0.46" android:scaleY="0.46" android:translateX="8" android:translateY="8">
+        <path android:pathData="M72,42 H128 A30,30 0 0,1 158,72 V128 A30,30 0 0,1 128,158 H72 A30,30 0 0,1 42,128 V72 A30,30 0 0,1 72,42 Z"
+            android:fillColor="#24FFFFFF" android:strokeColor="#99FFFFFF" android:strokeWidth="2" />
+        <path android:pathData="M40.5,64 A4.5,4.5 0 0,1 45,68.5 V79.5 A4.5,4.5 0 0,1 36,79.5 V68.5 A4.5,4.5 0 0,1 40.5,64 Z" android:fillColor="#D9FFFFFF" />
+        <path android:pathData="M40.5,116 A4.5,4.5 0 0,1 45,120.5 V131.5 A4.5,4.5 0 0,1 36,131.5 V120.5 A4.5,4.5 0 0,1 40.5,116 Z" android:fillColor="#D9FFFFFF" />
+        <path android:pathData="M138.50,100.00 L141.50,100.00 M133.34,119.25 L135.94,120.75 M119.25,133.34 L120.75,135.94 M100.00,138.50 L100.00,141.50 M80.75,133.34 L79.25,135.94 M66.66,119.25 L64.06,120.75 M61.50,100.00 L58.50,100.00 M66.66,80.75 L64.06,79.25 M80.75,66.66 L79.25,64.06 M100.00,61.50 L100.00,58.50 M119.25,66.66 L120.75,64.06 M133.34,80.75 L135.94,79.25" android:strokeColor="#80FFFFFF" android:strokeWidth="2.6" android:strokeLineCap="round" />
+        <path android:pathData="M68,100 A32,32 0 1,0 132,100 A32,32 0 1,0 68,100" android:strokeColor="#EBFFFFFF" android:strokeWidth="6" />
+        <path android:pathData="M91,100 A9,9 0 1,0 109,100 A9,9 0 1,0 91,100 Z" android:fillColor="#FF5EE0B5" />
+        <path android:pathData="M100,68 V80" android:strokeColor="#FF5EE0B5" android:strokeWidth="5" android:strokeLineCap="round" />
+    </group>
+</vector>

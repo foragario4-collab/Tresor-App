@@ -173,10 +173,12 @@ fun Modifier.pressable(
     scaleTo: Float = 0.96f,
     highlight: Float = 0.12f,
     haptic: Haptic = Haptic.TICK,
+    interaction: MutableInteractionSource? = null,
     onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit,
 ): Modifier {
-    val src = remember { MutableInteractionSource() }
+    val own = remember { MutableInteractionSource() }
+    val src = interaction ?: own
     val pressed by src.collectIsPressedAsState()
     val view = LocalView.current
     val scale by animateFloatAsState(

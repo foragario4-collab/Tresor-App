@@ -65,7 +65,7 @@ fun GlassGroup(content: @Composable ColumnScope.() -> Unit) {
 @Composable
 private fun ChoiceRow(icon: ImageVector, color: Color, title: String, sub: String, selected: Boolean, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().pressable(sq(18), onClick = onClick).padding(vertical = 10.dp, horizontal = 4.dp),
+        Modifier.fillMaxWidth().pressable(sq(16), onClick = onClick).padding(vertical = 10.dp, horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         AppTile(icon, color, size = 46.dp, radius = 13, iconSize = 24.dp)
@@ -113,6 +113,7 @@ fun SettingsScreen() {
                 SectionLabel("Tarnung")
                 Text("So erscheint die App auf dem Startbildschirm.", style = G.footnote, modifier = Modifier.padding(start = 4.dp))
                 GlassGroup {
+                    ChoiceRow(Ic.lock, Color(0xFF5B4BFF), "Keine Tarnung", "App heißt „Tresor“ mit eigenem Logo", App.disguise == Disguise.TRESOR) { App.applyDisguise(Disguise.TRESOR) }
                     ChoiceRow(Ic.calc, Color(0xFF3A3F4B), "Rechner", "Code eintippen, dann =", App.disguise == Disguise.RECHNER) { App.applyDisguise(Disguise.RECHNER) }
                     ChoiceRow(Ic.calendar, Color(0xFFE5484D), "Kalender", "Heutiges Datum lange drücken", App.disguise == Disguise.KALENDER) { App.applyDisguise(Disguise.KALENDER) }
                     ChoiceRow(Ic.checklist, Color(0xFF2F9E5B), "Checkliste", "Eintrag mit deinem Code anlegen", App.disguise == Disguise.CHECKLISTE) { App.applyDisguise(Disguise.CHECKLISTE) }
@@ -425,7 +426,7 @@ fun FolderSettingsScreen(fid: String) {
 @Composable
 private fun ProtRow(icon: ImageVector, title: String, sub: String, selected: Boolean, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().pressable(sq(18), onClick = onClick).padding(vertical = 12.dp, horizontal = 4.dp),
+        Modifier.fillMaxWidth().pressable(sq(16), onClick = onClick).padding(vertical = 12.dp, horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(Modifier.size(40.dp).glass(sq(12), Color.White.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {

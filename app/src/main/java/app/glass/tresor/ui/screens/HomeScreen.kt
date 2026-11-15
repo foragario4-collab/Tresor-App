@@ -273,7 +273,7 @@ private fun SearchResults(vault: Vault, query: String) {
         results.forEachIndexed { i, (fid, item) ->
             if (i > 0) Box(Modifier.fillMaxWidth().height(1.dp).background(G.divider))
             Row(
-                Modifier.fillMaxWidth().pressable(sq(14)) { openItem(fid, item, null) }.padding(vertical = 8.dp, horizontal = 4.dp),
+                Modifier.fillMaxWidth().pressable(sq(14)) { openItem(fid, item, null) }.padding(vertical = 8.dp, horizontal = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Thumb(vault, fid, item, Modifier.size(44.dp).clip(sq(10)), showBadge = false)

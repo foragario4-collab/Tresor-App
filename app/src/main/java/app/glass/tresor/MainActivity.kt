@@ -98,7 +98,7 @@ class MainActivity : FragmentActivity() {
         val d = Disguise.fromAlias(i?.component?.className) ?: return
         if (d != App.disguise) {
             App.disguise = d
-            App.prefs.edit().putInt("disguise", d.ordinal).apply()
+            App.prefs.edit().putString("disguiseName", d.name).apply()
         }
     }
 

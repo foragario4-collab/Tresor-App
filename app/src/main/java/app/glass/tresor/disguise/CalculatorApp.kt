@@ -90,12 +90,13 @@ fun CalculatorApp() {
     fun press(k: String) {
         when {
             k.length == 1 && k[0].isDigit() -> {
+                // Eingetippte Ziffern separat merken – so zählen auch führende Nullen (z. B. 0071)
+                if (fresh) typed = k else if (typed.length < 12) typed += k
                 if (fresh || display == "0") {
-                    display = k; fresh = false; typed = k
+                    display = k; fresh = false
                 } else {
                     val digits = display.count { it.isDigit() }
                     if (digits >= 12) return
-                    typed += k
                     val raw = display.replace(".", "") + k
                     display = if (raw.contains(',')) raw.substringBefore(',').let { fmt(BigDecimal(it.ifEmpty { "0" })) } + "," + raw.substringAfter(',')
                     else fmt(BigDecimal(raw))

@@ -41,6 +41,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
@@ -176,8 +178,13 @@ private fun FolderCard(vault: Vault, f: Folder, filter: ItemType?, onLong: () ->
     val unlocked = f.id in vault.unlockedFolders
     val items = if (unlocked) folderItems(vault, f.id, filter) else emptyList()
     val cover = items.firstOrNull { it.type == ItemType.IMAGE || it.type == ItemType.VIDEO }
+    // Nicht die ganze Spalte abrunden – sonst schneidet die Ecke die Beschriftung darunter an.
+    // Drück-Effekt: ganze Karte federt, das Aufhellen passiert nur im abgerundeten Bild.
+    val src = remember { MutableInteractionSource() }
+    val pressed by src.collectIsPressedAsState()
+    val hl by androidx.compose.animation.core.animateFloatAsState(if (pressed) 0.14f else 0f, label = "cardHl")
     Column(
-        Modifier.pressable(sq(24), onLongClick = onLong, onClick = onClick),
+        Modifier.pressable(null, highlight = 0f, interaction = src, onLongClick = onLong, onClick = onClick),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Box(
@@ -186,7 +193,11 @@ private fun FolderCard(vault: Vault, f: Folder, filter: ItemType?, onLong: () ->
                 .aspectRatio(1f)
                 .clip(sq(24))
                 .background(placeholderFor(f.id).copy(alpha = if (f.isProtected) 0.55f else 1f))
-                .border(1.dp, Color.White.copy(alpha = 0.14f), sq(24)),
+                .border(1.dp, Color.White.copy(alpha = 0.14f), sq(24))
+                .drawWithContent {
+                    drawContent()
+                    if (hl > 0f) drawRect(Color.White.copy(alpha = hl))
+                },
             contentAlignment = Alignment.Center
         ) {
             when {

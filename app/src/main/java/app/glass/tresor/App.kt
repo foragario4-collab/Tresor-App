@@ -19,6 +19,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 enum class Disguise(val alias: String, val title: String) {
+    TRESOR("app.glass.tresor.alias.Tresor", "Tresor"),
     RECHNER("app.glass.tresor.alias.Rechner", "Rechner"),
     KALENDER("app.glass.tresor.alias.Kalender", "Kalender"),
     CHECKLISTE("app.glass.tresor.alias.Checkliste", "Checkliste"),
@@ -86,7 +87,7 @@ object App {
 
     var vault by mutableStateOf<Vault?>(null)
     val nav = Nav()
-    var disguise by mutableStateOf(Disguise.RECHNER)
+    var disguise by mutableStateOf(Disguise.TRESOR)
 
     /** Während Foto-Auswahl, Kamera oder Systemsperre nicht automatisch sperren. */
     @Volatile
@@ -118,7 +119,7 @@ object App {
         secure = prefs.getBoolean("secure", true)
         motionLock = prefs.getBoolean("motion", false)
         wipeAfter10 = prefs.getBoolean("wipe10", false)
-        disguise = Disguise.entries.getOrNull(prefs.getInt("disguise", 0)) ?: Disguise.RECHNER
+        disguise = Disguise.entries.firstOrNull { it.name == prefs.getString("disguiseName", null) } ?: Disguise.TRESOR
         clearShareCache(force = true)
         emptyTrash()
         File(ctx.cacheDir, "update").deleteRecursively()
@@ -327,6 +328,6 @@ object App {
             )
         }
         disguise = d
-        prefs.edit().putInt("disguise", d.ordinal).apply()
+        prefs.edit().putString("disguiseName", d.name).apply()
     }
 }

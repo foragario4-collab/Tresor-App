@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="label_tresor">Tresor</string>
     <string name="label_rechner">Rechner</string>
     <string name="label_kalender">Kalender</string>
     <string name="label_checkliste">Checkliste</string>

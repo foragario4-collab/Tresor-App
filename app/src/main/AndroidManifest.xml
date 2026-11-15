@@ -25,9 +25,9 @@
         android:allowBackup="false"
         android:fullBackupContent="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
-        android:icon="@mipmap/ic_rechner"
-        android:roundIcon="@mipmap/ic_rechner"
-        android:label="@string/label_rechner"
+        android:icon="@mipmap/ic_tresor"
+        android:roundIcon="@mipmap/ic_tresor"
+        android:label="@string/label_tresor"
         android:supportsRtl="true"
         android:theme="@style/Theme.Tresor"
         tools:targetApi="35">
@@ -39,9 +39,24 @@
             android:windowSoftInputMode="adjustResize"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode|density|smallestScreenSize" />
 
+        <!-- Normalmodus: eigenes Logo, Name "Tresor" -->
+        <activity-alias
+            android:name=".alias.Tresor"
+            android:enabled="true"
+            android:exported="true"
+            android:icon="@mipmap/ic_tresor"
+            android:roundIcon="@mipmap/ic_tresor"
+            android:label="@string/label_tresor"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
         <activity-alias
             android:name=".alias.Rechner"
-            android:enabled="true"
+            android:enabled="false"
             android:exported="true"
             android:icon="@mipmap/ic_rechner"
             android:label="@string/label_rechner"

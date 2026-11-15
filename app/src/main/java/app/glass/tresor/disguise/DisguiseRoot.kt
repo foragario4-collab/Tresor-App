@@ -8,6 +8,7 @@ import app.glass.tresor.Screen
 @Composable
 fun DisguiseRoot() {
     when (App.disguise) {
+        Disguise.TRESOR -> app.glass.tresor.ui.screens.LockScreen(asRoot = true)
         Disguise.RECHNER -> CalculatorApp()
         Disguise.KALENDER -> CalendarApp()
         Disguise.CHECKLISTE -> ChecklistApp()

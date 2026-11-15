@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.withResumed
 import app.glass.tresor.App
 import app.glass.tresor.Disguise
 import app.glass.tresor.ui.Auth
@@ -171,7 +172,7 @@ private fun PinDot(filled: Boolean) {
 }
 
 @Composable
-fun LockScreen() {
+fun LockScreen(asRoot: Boolean = false) {
     val scope = rememberCoroutineScope()
     val activity = LocalContext.current as FragmentActivity
     val view = LocalView.current
@@ -227,11 +228,17 @@ fun LockScreen() {
                 }
             }
         )
-        Box(Modifier.statusBarsPadding().padding(start = 20.dp, top = 12.dp)) {
-            GlassIconButton(Ic.close, "Abbrechen") { App.nav.pop() }
+        if (!asRoot) {
+            Box(Modifier.statusBarsPadding().padding(start = 20.dp, top = 12.dp)) {
+                GlassIconButton(Ic.close, "Abbrechen") { App.nav.pop() }
+            }
         }
     }
-    LaunchedEffect(Unit) { if (bio && lockout == 0L) tryBio() }
+    // Fingerabdruck erst anbieten, wenn die App wirklich im Vordergrund ist
+    LaunchedEffect(Unit) {
+        activity.lifecycle.withResumed { }
+        if (bio && lockout == 0L) tryBio()
+    }
 }
 
 @Composable
@@ -271,7 +278,7 @@ fun SetupScreen() {
                     Spacer(Modifier.height(28.dp))
                     Column(Modifier.fillMaxWidth().glass(app.glass.tresor.ui.sq(24)).padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                         SetupPoint(Ic.lock, "Nur mit deinem Code", "Ohne Code bleibt alles unlesbarer Datensalat.")
-                        SetupPoint(Ic.calc, "Getarnt als Rechner", "Code eintippen und = drücken öffnet den Tresor.")
+                        SetupPoint(Ic.calc, "Tarnung auf Wunsch", "Später als Rechner, Kalender, Checkliste oder News tarnbar.")
                         SetupPoint(Ic.shield, "Kein Zugriff von außen", "Keine Cloud, keine Werbung, keine Tracker.")
                     }
                     Spacer(Modifier.weight(1f))
@@ -307,7 +314,7 @@ fun SetupScreen() {
                         busy = true
                         scope.launch {
                             withContext(Dispatchers.Default) { App.vaultA.create(pin.toCharArray()) }
-                            App.applyDisguise(Disguise.RECHNER)
+                            App.applyDisguise(Disguise.TRESOR)
                             App.vault = App.vaultA
                             busy = false
                             App.nav.openVault()
