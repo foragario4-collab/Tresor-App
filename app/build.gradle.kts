@@ -1,3 +1,6 @@
+import java.security.KeyStore
+import java.security.MessageDigest
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -12,14 +15,13 @@ val hasReleaseKey = ksFile.exists() && !ksPass.isNullOrEmpty()
 
 // Fingerabdruck (SHA-256) des Signier-Zertifikats → die App prüft beim Start, ob sie echt ist
 val certSha256: String = if (hasReleaseKey) {
-    try {
-        val ks = java.security.KeyStore.getInstance("PKCS12")
-        ksFile.inputStream().use { ks.load(it, ksPass!!.toCharArray()) }
-        val cert = ks.getCertificate("tresor")
-        java.security.MessageDigest.getInstance("SHA-256").digest(cert.encoded).joinToString("") { "%02x".format(it) }
-    } catch (e: Exception) {
-        ""
-    }
+    // Schlägt das fehl, bricht der Build ab, statt die Prüfung still abzuschalten
+    val ks = KeyStore.getInstance("PKCS12")
+    ksFile.inputStream().use { input -> ks.load(input, ksPass!!.toCharArray()) }
+    val cert = ks.getCertificate("tresor")
+        ?: throw GradleException("Im Signierschlüssel fehlt der Eintrag 'tresor'.")
+    MessageDigest.getInstance("SHA-256").digest(cert.encoded)
+        .joinToString("") { b -> "%02x".format(b) }
 } else ""
 
 android {
