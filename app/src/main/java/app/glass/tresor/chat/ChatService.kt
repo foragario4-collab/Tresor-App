@@ -273,7 +273,7 @@ class ChatService : Service() {
                 state = "Verbindet …"
             }
             synchronized(signal) {
-                try { signal.wait(if (port > 0) 30_000 else 3_000) } catch (_: InterruptedException) {}
+                try { signal.wait(if (port > 0) 30_000L else 3_000L) } catch (_: InterruptedException) {}
             }
         }
     }

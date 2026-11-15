@@ -13,8 +13,8 @@ import java.io.File
  * Nachrichten liegen hier ohnehin nur Ende-zu-Ende-verschlüsselt – der Dienst kann sie nie lesen.
  *
  *  chat/registry.bin          → welche Tresore einen Chat haben + lokaler Port
- *  chat/<slot>/inbox/*.bin    → empfangene, noch ungelesene Pakete
- *  chat/<slot>/outbox/*.bin   → zu sendende Pakete (Ziel-Adresse + Paket)
+ *  chat/<slot>/inbox/<id>.bin → empfangene, noch ungelesene Pakete
+ *  chat/<slot>/outbox/<id>.bin → zu sendende Pakete (Ziel-Adresse + Paket)
  *  chat/<slot>/sent/<id>      → Zustellbestätigung, wird beim Entsperren übernommen
  */
 object ChatSpool {

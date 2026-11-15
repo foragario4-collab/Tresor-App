@@ -243,9 +243,7 @@ fun BrowserScreen() {
 
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 AndroidView({ web }, Modifier.fillMaxSize())
-                AnimatedVisibility(!started, enter = fadeIn(), exit = fadeOut()) {
-                    StartPage(bookmarks, onOpen = { go(it.url) })
-                }
+                if (!started) StartPage(bookmarks, onOpen = { go(it.url) })
             }
 
             // Untere Leiste
