@@ -1,0 +1,48 @@
+name: APK bauen
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # Android-SDK ist auf den GitHub-Servern bereits vorinstalliert (ANDROID_HOME)
+      - name: Android-Lizenzen bestätigen
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.11.1"
+
+      - name: APK bauen
+        run: gradle assembleRelease --stacktrace -PbuildNumber=${{ github.run_number }} -PgithubRepo=${{ github.repository }}
+
+      - name: APK umbenennen
+        run: cp app/build/outputs/apk/release/*.apk Tresor-1.${{ github.run_number }}.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Tresor-APK
+          path: Tresor-1.${{ github.run_number }}.apk
+
+      # Release anlegen – daraus holt sich die App ihre Updates
+      - name: Release veröffentlichen
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}
+          name: Tresor 1.${{ github.run_number }}
+          body: Automatischer Build ${{ github.run_number }}
+          files: Tresor-1.${{ github.run_number }}.apk
+          make_latest: true
