@@ -150,8 +150,8 @@ private fun Root() {
             targetState = nav.top,
             transitionSpec = {
                 val spec = spring<IntOffset>(dampingRatio = 1f, stiffness = 520f)
-                val toVault = targetState == Screen.Home && initialState !is Screen.Albums &&
-                    initialState !is Screen.Settings
+                val toVault = targetState == Screen.Home &&
+                    (initialState == Screen.Disguise || initialState == Screen.Lock || initialState == Screen.Setup)
                 if (toVault || targetState == Screen.Disguise) {
                     (fadeIn(tween(260)) + scaleIn(initialScale = 0.94f, animationSpec = spring(dampingRatio = 0.8f, stiffness = 380f)))
                         .togetherWith(fadeOut(tween(180)) + scaleOut(targetScale = 1.04f))
@@ -177,6 +177,11 @@ private fun Root() {
                 is Screen.NoteEdit -> NoteEditScreen(s.fid, s.iid)
                 Screen.Settings -> SettingsScreen()
                 is Screen.FolderSettings -> FolderSettingsScreen(s.fid)
+                Screen.Browser -> app.glass.tresor.ui.screens.BrowserScreen()
+                Screen.Chat -> app.glass.tresor.ui.screens.ChatListScreen()
+                is Screen.ChatThread -> app.glass.tresor.ui.screens.ChatThreadScreen(s.contactId)
+                Screen.ChatCode -> app.glass.tresor.ui.screens.ChatCodeScreen()
+                Screen.ChatTips -> app.glass.tresor.ui.screens.ChatTipsScreen()
             }
         }
         Toast(Modifier.align(Alignment.BottomCenter))

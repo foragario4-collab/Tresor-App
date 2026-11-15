@@ -78,14 +78,13 @@ private fun ChoiceRow(icon: ImageVector, color: Color, title: String, sub: Strin
     }
 }
 
-private enum class PinSheet { NONE, CHANGE, DECOY, PANIC }
+private enum class PinSheet { NONE, CHANGE, NEWVAULT, PANIC }
 
 @Composable
 fun SettingsScreen() {
     val vault = App.vault ?: return
     val activity = LocalContext.current as FragmentActivity
     val scope = rememberCoroutineScope()
-    val isReal = vault === App.vaultA
     var bio by remember { mutableStateOf(vault.bioEnabled()) }
     var pinSheet by remember { mutableStateOf(PinSheet.NONE) }
     var p1 by remember { mutableStateOf("") }
@@ -94,8 +93,9 @@ fun SettingsScreen() {
     var busy by remember { mutableStateOf(false) }
     var err by remember { mutableStateOf<String?>(null) }
     var confirmWipe by remember { mutableStateOf(false) }
-    var decoyExists by remember { mutableStateOf(App.vaultB.exists()) }
+    var confirmDeleteThis by remember { mutableStateOf(false) }
     var panicOn by remember { mutableStateOf(App.panicEnabled()) }
+    var delOrig by remember { mutableStateOf(App.prefs.getBoolean("deleteOriginals", true)) }
 
     fun closeSheet() {
         pinSheet = PinSheet.NONE; p1 = ""; p2 = ""; p3 = ""; err = null
@@ -126,14 +126,16 @@ fun SettingsScreen() {
 
                 SectionLabel("Entsperren")
                 GlassGroup {
-                    if (isReal && Auth.available(activity)) {
+                    if (Auth.available(activity)) {
                         SettingRow("Systemsperre", "Fingerabdruck oder Geräte-PIN") {
                             GlassSwitch(bio, "Systemsperre") { on ->
                                 if (on) {
                                     val c = try { vault.bioEncryptCipher() } catch (e: Exception) { null }
                                     if (c == null) { App.toast("Nicht verfügbar"); return@GlassSwitch }
                                     Auth.prompt(activity, "Systemsperre aktivieren", null, c, onSuccess = { ok ->
-                                        vault.enableBio(ok); bio = true
+                                        // Nur ein Tresor kann per Fingerabdruck öffnen – dieser hier
+                                        App.vaults.filter { it !== vault }.forEach { if (it.bioEnabled()) it.disableBio() }
+                                        vault.enableBio(ok); App.setBioSlot(vault.slot); bio = true
                                     }, onFail = {})
                                 } else {
                                     vault.disableBio(); bio = false
@@ -141,16 +143,16 @@ fun SettingsScreen() {
                             }
                         }
                     }
-                    SettingRow("Code ändern", null, showDivider = isReal && Auth.available(activity)) {
+                    SettingRow("Code ändern", null, showDivider = Auth.available(activity)) {
                         PillButton("Ändern", height = 38.dp) { pinSheet = PinSheet.CHANGE }
                     }
-                    if (isReal) {
+                    run {
                         SettingRow(
-                            "Tarn-PIN",
-                            if (decoyExists) "Aktiv – öffnet einen Schein-Tresor" else "Zweite PIN für einen harmlosen Schein-Tresor",
+                            "Weiterer geheimer Tresor",
+                            "Eigener Code öffnet einen eigenen, getrennten Tresor",
                             showDivider = true
                         ) {
-                            PillButton(if (decoyExists) "Neu" else "Einrichten", height = 38.dp) { pinSheet = PinSheet.DECOY }
+                            PillButton("Anlegen", height = 38.dp) { pinSheet = PinSheet.NEWVAULT }
                         }
                         SettingRow(
                             "Notfall-Löschcode",
@@ -161,9 +163,9 @@ fun SettingsScreen() {
                         }
                     }
                 }
-                if (isReal) {
+                run {
                     Text(
-                        "Der Löschcode funktioniert überall, wo du sonst deinen Code eingibst – auch im Rechner und während einer Sperrzeit. Alles wird sofort unwiderruflich vernichtet.",
+                        "Jeder Code öffnet nur seinen eigenen Tresor. Von innen sieht man nicht, ob oder wie viele andere es gibt. Der Löschcode funktioniert überall, wo du sonst deinen Code eingibst – auch im Rechner und während einer Sperrzeit. Alles wird sofort unwiderruflich vernichtet.",
                         style = G.footnote.copy(color = G.faint), modifier = Modifier.padding(start = 4.dp)
                     )
                 }
@@ -176,10 +178,11 @@ fun SettingsScreen() {
                     SettingRow("Sperre bei Bewegung", "Sperrt sofort bei ruckartiger Bewegung", showDivider = true) {
                         GlassSwitch(App.motionLock, "Bewegung") { App.setMotion(it) }
                     }
-                    if (isReal) {
-                        SettingRow("Nach 10 Fehlversuchen löschen", "Löscht den gesamten Tresor unwiderruflich", showDivider = true) {
-                            GlassSwitch(App.wipeAfter10, "Selbstlöschung") { App.setWipe(it) }
-                        }
+                    SettingRow("Originale nach Import löschen", "Android fragt nach, bevor Fotos aus der Galerie gelöscht werden", showDivider = true) {
+                        GlassSwitch(delOrig, "Originale löschen") { delOrig = it; App.prefs.edit().putBoolean("deleteOriginals", it).apply() }
+                    }
+                    SettingRow("Nach 10 Fehlversuchen löschen", "Löscht alle Tresore unwiderruflich", showDivider = true) {
+                        GlassSwitch(App.wipeAfter10, "Selbstlöschung") { App.setWipe(it) }
                     }
                 }
 
@@ -191,25 +194,24 @@ fun SettingsScreen() {
                     InfoRow("Verschlüsselung", "AES-256-GCM")
                     InfoRow("Schlüssel aus Code", "PBKDF2-SHA512, 210.000 Runden", true)
                     InfoRow("Hardware-Schutz", "Android Keystore", true)
-                    InfoRow("Internet im Tresor", "Keiner", true)
+                    InfoRow("Internet", "Nur Browser, Chat (Tor), News, Updates", true)
                 }
 
-                if (isReal) {
-                    Spacer(Modifier.height(6.dp))
-                    PillButton("Tresor komplett löschen", textColor = G.red, modifier = Modifier.fillMaxWidth()) { confirmWipe = true }
-                }
+                Spacer(Modifier.height(6.dp))
+                PillButton("Diesen Tresor löschen", textColor = G.red, modifier = Modifier.fillMaxWidth()) { confirmDeleteThis = true }
+                PillButton("Alles löschen (alle Tresore)", textColor = G.red, modifier = Modifier.fillMaxWidth()) { confirmWipe = true }
             }
         }
 
         Sheet(pinSheet != PinSheet.NONE, { closeSheet() }) {
-            val decoy = pinSheet == PinSheet.DECOY
+            val decoy = pinSheet == PinSheet.NEWVAULT
             val panic = pinSheet == PinSheet.PANIC
             val newOnly = decoy || panic
             SheetHeader(
                 if (panic) Ic.trash else Ic.keypad,
-                when { decoy -> "Tarn-PIN"; panic -> "Notfall-Löschcode"; else -> "Code ändern" },
+                when { decoy -> "Neuer geheimer Tresor"; panic -> "Notfall-Löschcode"; else -> "Code ändern" },
                 err ?: when {
-                    decoy -> "Diese PIN öffnet einen leeren Schein-Tresor. Lege dort harmlose Bilder ab."
+                    decoy -> "Mit diesem Code öffnet sich ein eigener, leerer Tresor. Nutze ihn z. B. als harmlosen Schein-Tresor."
                     panic -> "Wer diesen Code eingibt, löscht sofort alles. Danach erscheint ein leerer Tresor."
                     else -> null
                 }
@@ -220,7 +222,7 @@ fun SettingsScreen() {
             }
             GlassField(
                 p2, { p2 = it; err = null },
-                when { decoy -> "Tarn-PIN"; panic -> "Löschcode"; else -> "Neuer Code" },
+                when { decoy -> "Code für den neuen Tresor"; panic -> "Löschcode"; else -> "Neuer Code" },
                 password = true, numeric = true, autoFocus = newOnly
             )
             Spacer(Modifier.height(10.dp))
@@ -235,34 +237,23 @@ fun SettingsScreen() {
                     scope.launch {
                         val msg = withContext(Dispatchers.Default) {
                             if (panic) {
-                                when {
-                                    App.vaultA.verifyPin(p2.toCharArray()) -> "Darf nicht dein echter Code sein."
-                                    App.vaultB.exists() && App.vaultB.verifyPin(p2.toCharArray()) -> "Darf nicht deine Tarn-PIN sein."
-                                    else -> { App.setPanicCode(p2.toCharArray()); null }
-                                }
+                                if (App.vaults.any { it.exists() && it.verifyPin(p2.toCharArray()) }) "Dieser Code öffnet schon einen Tresor."
+                                else { App.setPanicCode(p2.toCharArray()); null }
                             } else if (App.isPanicCode(p2.toCharArray())) {
                                 "Das ist dein Löschcode."
                             } else if (decoy) {
-                                if (App.vaultA.verifyPin(p2.toCharArray())) "Darf nicht dein echter Code sein."
-                                else {
-                                    App.vaultB.wipeAll()
-                                    App.vaultB.create(p2.toCharArray())
-                                    App.vaultB.lock()
-                                    null
-                                }
+                                if (App.createVault(p2.toCharArray()) == null) "Dieser Code ist schon vergeben." else null
                             } else {
-                                val other = if (isReal) App.vaultB else App.vaultA
-                                if (other.exists() && other.verifyPin(p2.toCharArray())) "Dieser Code ist schon vergeben."
+                                if (App.vaults.any { it !== vault && it.exists() && it.verifyPin(p2.toCharArray()) }) "Dieser Code ist schon vergeben."
                                 else if (vault.changePin(p1.toCharArray(), p2.toCharArray())) null
                                 else "Aktueller Code ist falsch."
                             }
                         }
                         busy = false
                         if (msg != null) err = msg else {
-                            if (decoy) decoyExists = true
                             if (panic) panicOn = true
                             closeSheet()
-                            App.toast(when { decoy -> "Tarn-PIN eingerichtet"; panic -> "Löschcode eingerichtet"; else -> "Code geändert" })
+                            App.toast(when { decoy -> "Neuer Tresor angelegt"; panic -> "Löschcode eingerichtet"; else -> "Code geändert" })
                         }
                     }
                 }
@@ -277,9 +268,26 @@ fun SettingsScreen() {
         }
 
         ConfirmSheet(
+            visible = confirmDeleteThis,
+            title = "Diesen Tresor löschen?",
+            text = "Alles in diesem Tresor wird unwiderruflich gelöscht. Andere Tresore bleiben unberührt.",
+            confirm = "Löschen",
+            onDismiss = { confirmDeleteThis = false }
+        ) {
+            confirmDeleteThis = false
+            if (vault === App.vaultA) {
+                scope.launch {
+                    withContext(Dispatchers.IO) { vault.resetContents() }
+                    App.toast("Tresor geleert")
+                    App.nav.pop()
+                }
+            } else App.deleteCurrentVault()
+        }
+
+        ConfirmSheet(
             visible = confirmWipe,
             title = "Alles löschen?",
-            text = "Alle Fotos, Videos, Dateien und Notizen werden unwiderruflich gelöscht.",
+            text = "Alle Tresore mit allen Fotos, Videos, Dateien, Notizen und Chats werden unwiderruflich gelöscht.",
             confirm = "Endgültig löschen",
             onDismiss = { confirmWipe = false }
         ) {
@@ -346,7 +354,7 @@ fun FolderSettingsScreen(fid: String) {
                     }
                     ProtRow(Ic.keypad, "Tresor-PIN", "Derselbe Code wie beim Öffnen", f.protection == Protection.PIN) { target = Protection.PIN }
                     ProtRow(Ic.keyboard, "Eigenes Passwort", "Buchstaben, Zahlen, Zeichen", f.protection == Protection.PASSWORD) { target = Protection.PASSWORD }
-                    if (vault === App.vaultA && Auth.available(activity)) {
+                    if (Auth.available(activity)) {
                         ProtRow(Ic.fingerprint, "Systemsperre", "Fingerabdruck – PIN geht immer als Notfall", f.protection == Protection.SYSTEM) { target = Protection.SYSTEM }
                     }
                 }

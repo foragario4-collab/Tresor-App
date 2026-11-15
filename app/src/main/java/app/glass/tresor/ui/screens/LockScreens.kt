@@ -180,7 +180,8 @@ fun LockScreen(asRoot: Boolean = false) {
     var busy by remember { mutableStateOf(false) }
     var shake by remember { mutableIntStateOf(0) }
     var lockout by remember { mutableStateOf(App.lockoutRemainingMs()) }
-    val bio = remember { App.vaultA.bioEnabled() && Auth.available(activity) }
+    val bioVault = remember { App.bioVault() }
+    val bio = remember { bioVault != null && Auth.available(activity) }
 
     LaunchedEffect(lockout > 0) {
         while (lockout > 0) {
@@ -189,11 +190,12 @@ fun LockScreen(asRoot: Boolean = false) {
     }
 
     fun tryBio() {
-        val c = App.vaultA.bioDecryptCipher() ?: return
+        val bv = bioVault ?: return
+        val c = bv.bioDecryptCipher() ?: return
         Auth.prompt(activity, "Entsperren", null, c, onSuccess = { ok ->
             scope.launch {
-                val success = withContext(Dispatchers.Default) { App.vaultA.unlockWithBio(ok) }
-                if (success) App.onBioUnlocked()
+                val success = withContext(Dispatchers.Default) { bv.unlockWithBio(ok) }
+                if (success) App.onBioUnlocked(bv)
             }
         }, onFail = {})
     }

@@ -40,6 +40,24 @@ Tarnung wechseln: Tresor → Einstellungen → Tarnung.
 Ordner lange drücken → Schutz wählen: Tresor-PIN, eigenes Passwort oder Systemsperre (Fingerabdruck, die PIN funktioniert immer als Notfall).
 „Ordner ausblenden“ versteckt ihn komplett. Sichtbar wird er erst durch langes Drücken auf den Titel (Fotos / Videos / Dateien / Notizen).
 
+## Mehrere geheime Tresore
+
+Einstellungen → „Weiterer geheimer Tresor“ → eigenen Code festlegen.
+Jeder Code öffnet nur seinen eigenen Tresor. Von innen sieht man nicht, ob oder wie viele andere es gibt.
+Nur ein Tresor kann per Fingerabdruck öffnen (der, in dem die Systemsperre zuletzt eingeschaltet wurde).
+
+## Chat (über Tor, ohne Server)
+
+Startseite → Chat → Anzeigename → „Chat einrichten“. Tor startet (beim ersten Mal 30–60 Sekunden).
+Kontakt hinzufügen: QR-Code des anderen scannen oder seinen Text-Code einfügen. Der andere bekommt eine Anfrage und nimmt sie an.
+Nachrichten kommen an, sobald beide Handys online sind. Im Gespräch auf den Namen tippen → Sicherheitsnummer vergleichen.
+Damit es im Hintergrund zuverlässig läuft: Chat → Tipps → Akku-Optimierung ausschalten.
+
+## Privater Browser
+
+Startseite → Browser. Kein Verlauf, Cookies und Website-Daten werden beim Sperren gelöscht.
+Lesezeichen sind verschlüsselt, Downloads landen verschlüsselt unter Dateien → Downloads.
+
 ## Notfall-Löschcode
 
 Einstellungen → „Notfall-Löschcode“. Wird dieser Code irgendwo eingegeben (Sperrbildschirm, Rechner, Checkliste – auch während einer Sperrzeit), passiert Folgendes:

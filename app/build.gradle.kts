@@ -60,6 +60,9 @@ android {
     }
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        resources.excludes += "META-INF/versions/9/OSGI-INF/MANIFEST.MF"
+        // Tor-Bibliothek muss als Datei entpackt werden
+        jniLibs.useLegacyPackaging = true
     }
 }
 
@@ -81,4 +84,11 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer:1.5.0")
     implementation("androidx.media3:media3-ui:1.5.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+
+    // Chat: Tor (Onion-Dienste), Schlüsselaustausch X25519, QR-Codes
+    implementation("info.guardianproject:tor-android:0.4.9.12")
+    implementation("info.guardianproject:jtorctl:0.4.5.7")
+    implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
+    implementation("com.google.zxing:core:3.5.3")
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
 }

@@ -61,4 +61,12 @@ object Ic {
     val play = filled("play", "M8 5v14l11 -7z")
     val select = stroke("select", "M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0 -18z M8 12l3 3l5 -6")
     val dots = filled("dots", "M5 10.4a1.6 1.6 0 1 0 0 3.2a1.6 1.6 0 1 0 0 -3.2z M12 10.4a1.6 1.6 0 1 0 0 3.2a1.6 1.6 0 1 0 0 -3.2z M19 10.4a1.6 1.6 0 1 0 0 3.2a1.6 1.6 0 1 0 0 -3.2z")
+    val globe = stroke("globe", "M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0 -18z M3 12h18 M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4 -3.8 9 M12 3c-2.5 2.6 -3.8 5.6 -3.8 9s1.3 6.4 3.8 9")
+    val chat = stroke("chat", "M5 5h14a2 2 0 0 1 2 2v9a2 2 0 0 1 -2 2H10l-5 4v-4a2 2 0 0 1 -2 -2V7a2 2 0 0 1 2 -2z")
+    val qr = stroke("qr", "M4 4h6v6H4z M14 4h6v6h-6z M4 14h6v6H4z M14 14h2v2h-2z M18 14h2 M14 18h2 M18 18h2v2 M16 16h2v2")
+    val info = stroke("info", "M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0 -18z M12 11v6 M12 7.5h0.01")
+    val send = filled("send", "M3.4 20.4L21 12L3.4 3.6L3.4 10L15 12L3.4 14z")
+    val clock = stroke("clock", "M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0 -18z M12 7v5l3 2")
+    val copy = stroke("copy", "M9 9h10a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1H9a1 1 0 0 1 -1 -1V10a1 1 0 0 1 1 -1z M5 15H4a1 1 0 0 1 -1 -1V4a1 1 0 0 1 1 -1h10a1 1 0 0 1 1 1v1")
+    val person = stroke("person", "M12 4a4 4 0 1 0 0 8a4 4 0 1 0 0 -8z M4 20c0.8 -3.5 4 -6 8 -6s7.2 2.5 8 6")
 }

@@ -122,6 +122,14 @@ fun HomeScreen() {
                             App.nav.push(Screen.Albums(FolderKind.NOTES, null))
                         }
                     }
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        ToolCard(Modifier.weight(1f), Ic.chat, Color(0xFF30A46C), "Chat", "Über Tor") {
+                            App.nav.push(Screen.Chat)
+                        }
+                        ToolCard(Modifier.weight(1f), Ic.globe, Color(0xFF3E63DD), "Browser", "Ohne Spuren") {
+                            App.nav.push(Screen.Browser)
+                        }
+                    }
                 }
 
                 val recent = vault.recentMedia()
@@ -230,6 +238,23 @@ private fun CategoryCard(modifier: Modifier, icon: ImageVector, color: Color, ti
         Column {
             Text(title, style = G.headline)
             Text(if (count == 1) "1 Element" else "$count Elemente", style = G.footnote)
+        }
+    }
+}
+
+@Composable
+private fun ToolCard(modifier: Modifier, icon: ImageVector, color: Color, title: String, sub: String, onClick: () -> Unit) {
+    Column(
+        modifier
+            .pressable(sq(24), onClick = onClick)
+            .glass(sq(24))
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        AppTile(icon, color)
+        Column {
+            Text(title, style = G.headline)
+            Text(sub, style = G.footnote)
         }
     }
 }

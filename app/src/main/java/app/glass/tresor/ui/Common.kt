@@ -260,14 +260,35 @@ fun rememberImport(vault: Vault, targetFid: () -> String?, onDone: (Int) -> Unit
     var busy by remember { mutableIntStateOf(0) }
     var pendingCam by remember { mutableStateOf<File?>(null) }
 
-    fun run(uris: List<Uri>, names: List<String?>? = null, cleanup: (() -> Unit)? = null) {
+    // Android fragt selbst nach, ob die Originale gelöscht werden dürfen (wie bei Photok)
+    val deleter = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { r ->
+        App.suppressLock = false
+        if (r.resultCode == android.app.Activity.RESULT_OK) App.toast("Originale gelöscht")
+    }
+
+    fun offerDeleteOriginals(imported: List<Uri>) {
+        if (!App.prefs.getBoolean("deleteOriginals", true) || imported.isEmpty()) return
+        val media = imported.mapNotNull { toMediaStoreUri(ctx, it) }
+        if (media.isEmpty()) return
+        try {
+            val pi = android.provider.MediaStore.createDeleteRequest(ctx.contentResolver, media)
+            App.suppressLock = true
+            deleter.launch(androidx.activity.result.IntentSenderRequest.Builder(pi.intentSender).build())
+        } catch (e: Exception) {
+            App.suppressLock = false
+            App.toast("Originale bitte in der Galerie löschen")
+        }
+    }
+
+    fun run(uris: List<Uri>, names: List<String?>? = null, offerDelete: Boolean = false, cleanup: (() -> Unit)? = null) {
         val fid = targetFid() ?: return
         busy = uris.size
         scope.launch {
             var n = 0
+            val done = mutableListOf<Uri>()
             for ((i, u) in uris.withIndex()) {
                 val ok = withContext(Dispatchers.IO) { Media.importUri(ctx, vault, fid, u, names?.getOrNull(i)) != null }
-                if (ok) n++
+                if (ok) { n++; done += u }
                 busy--
             }
             cleanup?.invoke()
@@ -275,16 +296,17 @@ fun rememberImport(vault: Vault, targetFid: () -> String?, onDone: (Int) -> Unit
             onDone(n)
             if (n > 0) App.toast(if (n == 1) "1 Element verschlüsselt" else "$n Elemente verschlüsselt")
             else App.toast("Import fehlgeschlagen")
+            if (offerDelete) offerDeleteOriginals(done)
         }
     }
 
     val media = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(50)) { uris ->
         App.suppressLock = false
-        if (uris.isNotEmpty()) run(uris)
+        if (uris.isNotEmpty()) run(uris, offerDelete = true)
     }
     val docs = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         App.suppressLock = false
-        if (uris.isNotEmpty()) run(uris)
+        if (uris.isNotEmpty()) run(uris, offerDelete = true)
     }
     val photo = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
         App.suppressLock = false
@@ -352,6 +374,23 @@ fun rememberImport(vault: Vault, targetFid: () -> String?, onDone: (Int) -> Unit
             },
         )
     }
+}
+
+/** Wandelt eine Auswahl-Adresse in die Galerie-Adresse um, damit Android das Original löschen kann. */
+fun toMediaStoreUri(ctx: android.content.Context, u: Uri): Uri? {
+    try {
+        android.provider.MediaStore.getMediaUri(ctx, u)?.let { return it }
+    } catch (_: Exception) {
+    }
+    if (u.authority == android.provider.MediaStore.AUTHORITY) {
+        val id = u.lastPathSegment?.toLongOrNull() ?: return null
+        return if (u.path?.contains("picker") == true)
+            android.content.ContentUris.withAppendedId(
+                android.provider.MediaStore.Files.getContentUri(android.provider.MediaStore.VOLUME_EXTERNAL), id
+            )
+        else u
+    }
+    return null
 }
 
 fun fileUri(ctx: android.content.Context, f: File): Uri =

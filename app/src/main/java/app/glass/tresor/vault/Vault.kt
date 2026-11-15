@@ -190,6 +190,50 @@ class Vault(val slot: String, val dir: File) {
         ThumbCache.clearSlot(slot)
     }
 
+    /** Leert den Tresor komplett (alle Ordner und Inhalte), der Code bleibt gleich. */
+    @Synchronized
+    fun resetContents() {
+        if (mk == null) return
+        folders.toList().forEach {
+            HwKeys.delete(folderAlias(it.id))
+        }
+        File(dir, "f").deleteRecursively()
+        File(dir, "blobs").deleteRecursively()
+        fkeys.values.forEach { Crypto.wipe(it) }
+        fkeys.clear(); folders.clear(); items.clear(); unlockedFolders.clear()
+        ThumbCache.clearSlot(slot)
+        newFolderInternal("Fotos", FolderKind.MEDIA)
+        newFolderInternal("Dateien", FolderKind.FILES)
+        newFolderInternal("Notizen", FolderKind.NOTES)
+        saveRoot()
+    }
+
+    // ───────────────────────── Verschlüsselte Zusatzdaten (Chat, Browser) ─────────────────────────
+
+    private fun blobFile(name: String) = File(dir, "blobs/$name.bin")
+
+    /** Liest einen verschlüsselten Datenblock dieses Tresors (mit dem Hauptschlüssel). */
+    fun readBlob(name: String): ByteArray? {
+        val k = mk ?: return null
+        val f = blobFile(name)
+        if (!f.exists()) return null
+        return try {
+            Crypto.open(k, f.readBytes(), "blob-$slot-$name".toByteArray())
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    fun writeBlob(name: String, data: ByteArray) {
+        val k = mk ?: throw IllegalStateException("gesperrt")
+        Crypto.writeAtomic(blobFile(name), Crypto.seal(k, data, "blob-$slot-$name".toByteArray()))
+    }
+
+    /** Ordner für Downloads finden oder anlegen. */
+    @Synchronized
+    fun ensureFolder(name: String, kind: FolderKind): Folder =
+        folders.firstOrNull { it.kind == kind && it.name == name && !it.isProtected } ?: createFolder(name, kind)
+
     fun wipeAll() {
         lock()
         dir.deleteRecursively()

@@ -41,6 +41,11 @@ sealed interface Screen {
     data class TextView(val fid: String, val iid: String) : Screen
     data class NoteEdit(val fid: String, val iid: String?) : Screen
     data object Settings : Screen
+    data object Browser : Screen
+    data object Chat : Screen
+    data class ChatThread(val contactId: String) : Screen
+    data object ChatCode : Screen
+    data object ChatTips : Screen
     data class FolderSettings(val fid: String) : Screen
 }
 
@@ -82,8 +87,23 @@ object App {
     lateinit var prefs: SharedPreferences
     lateinit var dprefs: SharedPreferences // Daten der Tarn-Apps (Kalender-Termine, Checkliste)
 
+    /** Erster Tresor (beim Einrichten angelegt). Nur er kann die Systemsperre nutzen. */
     lateinit var vaultA: Vault
-    lateinit var vaultB: Vault
+
+    /** Alle Tresore. Jeder Code öffnet genau seinen Tresor – keiner weiß von den anderen. */
+    val vaults = mutableListOf<Vault>()
+
+    private fun vaultsDir() = File(ctx.filesDir, "vaults")
+
+    private fun loadVaults() {
+        vaults.clear()
+        vaultA = Vault("a", File(vaultsDir(), "a"))
+        vaults.add(vaultA)
+        vaultsDir().listFiles()?.filter { it.isDirectory && it.name != "a" }?.sortedBy { it.name }?.forEach {
+            val v = Vault(it.name, it)
+            if (v.exists()) vaults.add(v) else it.deleteRecursively()
+        }
+    }
 
     var vault by mutableStateOf<Vault?>(null)
     val nav = Nav()
@@ -114,8 +134,7 @@ object App {
         ctx = c.applicationContext
         prefs = ctx.getSharedPreferences("cfg", Context.MODE_PRIVATE)
         dprefs = ctx.getSharedPreferences("disguise_data", Context.MODE_PRIVATE)
-        vaultA = Vault("a", File(ctx.filesDir, "vaults/a"))
-        vaultB = Vault("b", File(ctx.filesDir, "vaults/b"))
+        loadVaults()
         secure = prefs.getBoolean("secure", true)
         motionLock = prefs.getBoolean("motion", false)
         wipeAfter10 = prefs.getBoolean("wipe10", false)
@@ -172,11 +191,7 @@ object App {
         }
         val ok = withContext(Dispatchers.Default) {
             try {
-                when {
-                    vaultA.tryUnlock(chars) -> vaultA
-                    vaultB.exists() && vaultB.tryUnlock(chars) -> vaultB
-                    else -> null
-                }
+                vaults.toList().firstOrNull { it.exists() && it.tryUnlock(chars) }
             } finally {
                 Crypto.wipe(chars)
             }
@@ -210,11 +225,19 @@ object App {
             .forEach { v.relockFolder(it.id) }
     }
 
-    fun onBioUnlocked() {
+    fun onBioUnlocked(v: Vault) {
         resetFailures()
-        vault = vaultA
+        vault = v
         nav.openVault()
     }
+
+    /** Der eine Tresor, der per Systemsperre öffnet (falls eingerichtet). */
+    fun bioVault(): Vault? {
+        val slot = prefs.getString("bioSlot", "a")
+        return vaults.firstOrNull { it.slot == slot && it.bioEnabled() }
+    }
+
+    fun setBioSlot(slot: String) = prefs.edit().putString("bioSlot", slot).apply()
 
     /** Wird vor dem Sperren aufgerufen (z. B. offene Notiz speichern). */
     val beforeLock = mutableSetOf<() -> Unit>()
@@ -222,10 +245,11 @@ object App {
     fun lock() {
         if (vault == null && nav.top == Screen.Disguise) return
         beforeLock.toList().forEach { it() }
-        vaultA.lock()
-        vaultB.lock()
+        app.glass.tresor.chat.ChatEngine.close()
+        vaults.forEach { it.lock() }
         ThumbCache.clearAll()
         clearShareCache()
+        app.glass.tresor.browser.BrowserData.clearAll()
         vault = null
         if (!vaultA.exists()) nav.reset(Screen.Setup) else nav.reset(Screen.Disguise, fwd = false)
     }
@@ -275,9 +299,11 @@ object App {
      * sieht es aus wie ein ganz normaler, leerer Tresor.
      */
     fun panicWipe(code: CharArray) {
-        vaultA.lock(); vaultB.lock()
+        vaults.forEach { it.lock() }
         ThumbCache.clearAll()
+        app.glass.tresor.chat.ChatService.stop(ctx)
         crypticShred()
+        loadVaults()
         removePanicCode()
         prefs.edit().remove("wipe10").putInt("failed", 0).putLong("lockout", 0L).apply()
         wipeAfter10 = false
@@ -289,6 +315,8 @@ object App {
         HwKeys.delete(HwKeys.PEPPER_ALIAS)
         HwKeys.deletePrefix("tresor_vault_")
         HwKeys.deletePrefix("tresor_f_")
+        File(ctx.filesDir, "chat").let { if (it.exists()) it.renameTo(File(ctx.filesDir, "trash_chat_${System.nanoTime()}")) }
+        File(ctx.filesDir, "tor").let { if (it.exists()) it.renameTo(File(ctx.filesDir, "trash_tor_${System.nanoTime()}")) }
         val dir = File(ctx.filesDir, "vaults")
         val trash = File(ctx.filesDir, "trash_${System.nanoTime()}")
         if (dir.exists() && !dir.renameTo(trash)) dir.deleteRecursively()
@@ -303,15 +331,44 @@ object App {
     }
 
     fun wipeEverything() {
-        vaultA.lock()
-        vaultB.lock()
+        vaults.forEach { it.lock() }
+        app.glass.tresor.chat.ChatService.stop(ctx)
         crypticShred()
+        loadVaults()
         removePanicCode()
         ThumbCache.clearAll()
         clearShareCache(force = true)
         prefs.edit().putInt("failed", 0).putLong("lockout", 0L).apply()
         vault = null
         nav.reset(Screen.Setup)
+    }
+
+    // ───────────────────────── Weitere Tresore ─────────────────────────
+
+    /** Prüft, ob ein Code schon zu irgendeinem Tresor oder zum Löschcode gehört. */
+    fun codeInUse(code: CharArray): Boolean =
+        isPanicCode(code) || vaults.any { it.exists() && it.verifyPin(code) }
+
+    /** Legt einen neuen, unabhängigen Tresor an. Gibt null zurück, wenn der Code schon vergeben ist. */
+    fun createVault(code: CharArray): Vault? {
+        if (codeInUse(code)) return null
+        val slot = Crypto.b64(Crypto.random(6)).replace("/", "x").replace("+", "y").replace("=", "").lowercase()
+        val v = Vault(slot, File(vaultsDir(), slot))
+        v.create(code)
+        v.lock()
+        vaults.add(v)
+        return v
+    }
+
+    /** Löscht den gerade offenen Tresor (nicht den ersten). */
+    fun deleteCurrentVault() {
+        val v = vault ?: return
+        if (v === vaultA) return
+        app.glass.tresor.chat.ChatEngine.forget(v.slot)
+        v.wipeAll()
+        vaults.remove(v)
+        vault = null
+        nav.reset(Screen.Disguise, fwd = false)
     }
 
     fun applyDisguise(d: Disguise) {
