@@ -307,7 +307,7 @@ fun SetupScreen() {
                         busy = true
                         scope.launch {
                             withContext(Dispatchers.Default) { App.vaultA.create(pin.toCharArray()) }
-                            App.setDisguise(Disguise.RECHNER)
+                            App.applyDisguise(Disguise.RECHNER)
                             App.vault = App.vaultA
                             busy = false
                             App.nav.openVault()

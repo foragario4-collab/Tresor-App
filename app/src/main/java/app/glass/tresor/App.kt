@@ -125,7 +125,7 @@ object App {
         if (!vaultA.exists()) nav.reset(Screen.Setup)
     }
 
-    fun setSecure(v: Boolean) { secure = v; prefs.edit().putBoolean("secure", v).apply() }
+    fun changeSecure(v: Boolean) { secure = v; prefs.edit().putBoolean("secure", v).apply() }
     fun setMotion(v: Boolean) { motionLock = v; prefs.edit().putBoolean("motion", v).apply() }
     fun setWipe(v: Boolean) { wipeAfter10 = v; prefs.edit().putBoolean("wipe10", v).apply() }
 
@@ -313,7 +313,7 @@ object App {
         nav.reset(Screen.Setup)
     }
 
-    fun setDisguise(d: Disguise) {
+    fun applyDisguise(d: Disguise) {
         val pm = ctx.packageManager
         // Neues Icon zuerst aktivieren, dann die anderen ausblenden
         pm.setComponentEnabledSetting(

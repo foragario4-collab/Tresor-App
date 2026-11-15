@@ -113,10 +113,10 @@ fun SettingsScreen() {
                 SectionLabel("Tarnung")
                 Text("So erscheint die App auf dem Startbildschirm.", style = G.footnote, modifier = Modifier.padding(start = 4.dp))
                 GlassGroup {
-                    ChoiceRow(Ic.calc, Color(0xFF3A3F4B), "Rechner", "Code eintippen, dann =", App.disguise == Disguise.RECHNER) { App.setDisguise(Disguise.RECHNER) }
-                    ChoiceRow(Ic.calendar, Color(0xFFE5484D), "Kalender", "Heutiges Datum lange drücken", App.disguise == Disguise.KALENDER) { App.setDisguise(Disguise.KALENDER) }
-                    ChoiceRow(Ic.checklist, Color(0xFF2F9E5B), "Checkliste", "Eintrag mit deinem Code anlegen", App.disguise == Disguise.CHECKLISTE) { App.setDisguise(Disguise.CHECKLISTE) }
-                    ChoiceRow(Ic.news, G.blue, "News", "Titel „News“ lange drücken", App.disguise == Disguise.NEWS) { App.setDisguise(Disguise.NEWS) }
+                    ChoiceRow(Ic.calc, Color(0xFF3A3F4B), "Rechner", "Code eintippen, dann =", App.disguise == Disguise.RECHNER) { App.applyDisguise(Disguise.RECHNER) }
+                    ChoiceRow(Ic.calendar, Color(0xFFE5484D), "Kalender", "Heutiges Datum lange drücken", App.disguise == Disguise.KALENDER) { App.applyDisguise(Disguise.KALENDER) }
+                    ChoiceRow(Ic.checklist, Color(0xFF2F9E5B), "Checkliste", "Eintrag mit deinem Code anlegen", App.disguise == Disguise.CHECKLISTE) { App.applyDisguise(Disguise.CHECKLISTE) }
+                    ChoiceRow(Ic.news, G.blue, "News", "Titel „News“ lange drücken", App.disguise == Disguise.NEWS) { App.applyDisguise(Disguise.NEWS) }
                 }
                 Text(
                     "Das neue Icon erscheint nach ein paar Sekunden. Manche Startbildschirme brauchen einen Neustart des Launchers.",
@@ -170,7 +170,7 @@ fun SettingsScreen() {
                 SectionLabel("Schutz")
                 GlassGroup {
                     SettingRow("Screenshots blockieren", "Auch Bildschirmaufnahme und Vorschau in „Letzte Apps“") {
-                        GlassSwitch(App.secure, "Screenshots") { App.setSecure(it) }
+                        GlassSwitch(App.secure, "Screenshots") { App.changeSecure(it) }
                     }
                     SettingRow("Sperre bei Bewegung", "Sperrt sofort bei ruckartiger Bewegung", showDivider = true) {
                         GlassSwitch(App.motionLock, "Bewegung") { App.setMotion(it) }
