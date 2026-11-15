@@ -1,0 +1,64 @@
+package app.glass.tresor.ui
+
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.addPathNodes
+import androidx.compose.ui.unit.dp
+
+/** Eigene Linien-Icons (24er Raster), damit alles einheitlich wie im Entwurf aussieht. */
+object Ic {
+    private fun stroke(name: String, d: String, width: Float = 2f) =
+        ImageVector.Builder(name, 24.dp, 24.dp, 24f, 24f).addPath(
+            pathData = addPathNodes(d),
+            fill = null,
+            stroke = SolidColor(Color.White),
+            strokeLineWidth = width,
+            strokeLineCap = StrokeCap.Round,
+            strokeLineJoin = StrokeJoin.Round,
+        ).build()
+
+    private fun filled(name: String, d: String) =
+        ImageVector.Builder(name, 24.dp, 24.dp, 24f, 24f).addPath(
+            pathData = addPathNodes(d),
+            fill = SolidColor(Color.White),
+        ).build()
+
+    val lock = stroke("lock", "M7 11h10a3 3 0 0 1 3 3v4a3 3 0 0 1 -3 3H7a3 3 0 0 1 -3 -3v-4a3 3 0 0 1 3 -3z M8 11V7a4 4 0 0 1 8 0v4")
+    val unlock = stroke("unlock", "M7 11h10a3 3 0 0 1 3 3v4a3 3 0 0 1 -3 3H7a3 3 0 0 1 -3 -3v-4a3 3 0 0 1 3 -3z M8 11V7a4 4 0 0 1 7.5 -2")
+    val settings = stroke("settings", "M4 7h9 M17 7h3 M15 5v4 M4 17h3 M11 17h9 M9 15v4")
+    val search = stroke("search", "M11 4a7 7 0 1 0 0 14a7 7 0 1 0 0 -14z M20 20l-3.5 -3.5")
+    val photo = stroke("photo", "M6 4h12a3 3 0 0 1 3 3v10a3 3 0 0 1 -3 3H6a3 3 0 0 1 -3 -3V7a3 3 0 0 1 3 -3z M21 16l-5 -5l-9 9 M9 8a2 2 0 1 0 0 4a2 2 0 1 0 0 -4z")
+    val video = stroke("video", "M6 6h7a3 3 0 0 1 3 3v6a3 3 0 0 1 -3 3H6a3 3 0 0 1 -3 -3V9a3 3 0 0 1 3 -3z M16 10l5 -3v10l-5 -3")
+    val folder = stroke("folder", "M3 7a2 2 0 0 1 2 -2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2H5a2 2 0 0 1 -2 -2z")
+    val note = stroke("note", "M14 3H6a2 2 0 0 0 -2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2V9z M14 3v6h6 M8 13h8 M8 17h5")
+    val file = stroke("file", "M14 3H6a2 2 0 0 0 -2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2V9z M14 3v6h6")
+    val shield = stroke("shield", "M12 3L4 6v6c0 5 3.5 8 8 9c4.5 -1 8 -4 8 -9V6z M9 12l2 2l4 -4")
+    val back = stroke("back", "M15 18l-6 -6l6 -6", 2.2f)
+    val forward = stroke("forward", "M9 18l6 -6l-6 -6", 2.2f)
+    val plus = stroke("plus", "M12 5v14 M5 12h14", 2.2f)
+    val camera = stroke("camera", "M4 8h3l2 -3h6l2 3h3a1 1 0 0 1 1 1v9a1 1 0 0 1 -1 1H4a1 1 0 0 1 -1 -1V9a1 1 0 0 1 1 -1z M12 9.5a3.5 3.5 0 1 0 0 7a3.5 3.5 0 1 0 0 -7z")
+    val grid = stroke("grid", "M5 3h3a2 2 0 0 1 2 2v3a2 2 0 0 1 -2 2H5a2 2 0 0 1 -2 -2V5a2 2 0 0 1 2 -2z M16 3h3a2 2 0 0 1 2 2v3a2 2 0 0 1 -2 2h-3a2 2 0 0 1 -2 -2V5a2 2 0 0 1 2 -2z M5 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1 -2 2H5a2 2 0 0 1 -2 -2v-3a2 2 0 0 1 2 -2z M16 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1 -2 2h-3a2 2 0 0 1 -2 -2v-3a2 2 0 0 1 2 -2z")
+    val fingerprint = stroke("fingerprint", "M12 11v3 M8.5 9.5a4.5 4.5 0 0 1 7 3.5c0 2 -0.5 4 -1.5 6 M6 12a6 6 0 0 1 11 -3.3 M9 14c0 2 -0.4 3.6 -1.2 5 M18 13c0 2.2 -0.4 4.3 -1.1 6", 1.8f)
+    val eye = stroke("eye", "M2 12s4 -7 10 -7s10 7 10 7s-4 7 -10 7S2 12 2 12z M12 9a3 3 0 1 0 0 6a3 3 0 1 0 0 -6z")
+    val eyeOff = stroke("eyeOff", "M3 3l18 18 M10.6 6.1A10 10 0 0 1 12 6c5 0 9 6 9 6a17 17 0 0 1 -2.7 3.4 M6.6 7.6C4.4 9.1 3 12 3 12s4 6 9 6c1.4 0 2.7 -0.4 3.9 -1")
+    val trash = stroke("trash", "M4 7h16 M10 11v6 M14 11v6 M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2 -2l1 -12 M9 7V4h6v3")
+    val export = stroke("export", "M12 3v12 M7 8l5 -5l5 5 M5 14v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-5")
+    val move = stroke("move", "M3 7a2 2 0 0 1 2 -2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2H5a2 2 0 0 1 -2 -2z M10 13h6 M13 10l3 3l-3 3")
+    val check = stroke("check", "M5 12l5 5l9 -10", 3f)
+    val close = stroke("close", "M6 6l12 12 M18 6L6 18", 2.2f)
+    val backspace = stroke("backspace", "M9 5h11a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1H9l-6 -7z M12 9l6 6 M18 9l-6 6", 1.8f)
+    val refresh = stroke("refresh", "M20 12a8 8 0 1 1 -2.3 -5.6 M20 4v5h-5")
+    val edit = stroke("edit", "M4 20h4L19 9a2.8 2.8 0 0 0 -4 -4L4 16z M13.5 6.5l4 4")
+    val calc = stroke("calc", "M8 3h8a3 3 0 0 1 3 3v12a3 3 0 0 1 -3 3H8a3 3 0 0 1 -3 -3V6a3 3 0 0 1 3 -3z M8 7h8 M8.5 12h0.01 M12 12h0.01 M15.5 12h0.01 M8.5 16h0.01 M12 16h0.01 M15.5 16h0.01")
+    val calendar = stroke("calendar", "M6 5h12a3 3 0 0 1 3 3v10a3 3 0 0 1 -3 3H6a3 3 0 0 1 -3 -3V8a3 3 0 0 1 3 -3z M3 10h18 M8 3v4 M16 3v4")
+    val checklist = stroke("checklist", "M4 7l2 2l3 -3 M4 15l2 2l3 -3 M13 8h7 M13 16h7")
+    val news = stroke("news", "M6 4h12a3 3 0 0 1 3 3v10a3 3 0 0 1 -3 3H6a3 3 0 0 1 -3 -3V7a3 3 0 0 1 3 -3z M7 9h10 M7 13h10 M7 17h6")
+    val keypad = filled("keypad", "M6 6.4a1.6 1.6 0 1 0 0 3.2a1.6 1.6 0 1 0 0 -3.2z M12 6.4a1.6 1.6 0 1 0 0 3.2a1.6 1.6 0 1 0 0 -3.2z M18 6.4a1.6 1.6 0 1 0 0 3.2a1.6 1.6 0 1 0 0 -3.2z M6 12.4a1.6 1.6 0 1 0 0 3.2a1.6 1.6 0 1 0 0 -3.2z M12 12.4a1.6 1.6 0 1 0 0 3.2a1.6 1.6 0 1 0 0 -3.2z M18 12.4a1.6 1.6 0 1 0 0 3.2a1.6 1.6 0 1 0 0 -3.2z M12 18.4a1.6 1.6 0 1 0 0 3.2a1.6 1.6 0 1 0 0 -3.2z")
+    val keyboard = stroke("keyboard", "M5 6h14a3 3 0 0 1 3 3v6a3 3 0 0 1 -3 3H5a3 3 0 0 1 -3 -3V9a3 3 0 0 1 3 -3z M6 10h0.01 M10 10h0.01 M14 10h0.01 M18 10h0.01 M7 14h10")
+    val play = filled("play", "M8 5v14l11 -7z")
+    val select = stroke("select", "M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0 -18z M8 12l3 3l5 -6")
+    val dots = filled("dots", "M5 10.4a1.6 1.6 0 1 0 0 3.2a1.6 1.6 0 1 0 0 -3.2z M12 10.4a1.6 1.6 0 1 0 0 3.2a1.6 1.6 0 1 0 0 -3.2z M19 10.4a1.6 1.6 0 1 0 0 3.2a1.6 1.6 0 1 0 0 -3.2z")
+}
