@@ -26,8 +26,37 @@ jobs:
         with:
           gradle-version: "8.11.1"
 
+      # Signierschlüssel aus den GitHub Secrets holen (liegt nie im Repo)
+      - name: Signierschlüssel laden
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::Secret KEYSTORE_BASE64 fehlt – siehe README (Abschnitt Signierschlüssel)."
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > app/release.jks
+
+      # Werbeblocker: aktuelle Listen (wie uBlock/Brave) herunterladen und in die App packen
+      - name: Werbeblocker-Listen laden
+        run: |
+          mkdir -p app/src/main/assets
+          for u in https://easylist.to/easylist/easylist.txt https://easylist.to/easylist/easyprivacy.txt; do
+            curl -fsSL --retry 3 "$u" || true
+          done | grep -E '^\|\|[a-z0-9.-]+\^$' | sed -E 's/^\|\|//; s/\^$//' | sort -u > app/src/main/assets/adblock.txt || true
+          echo "Werbeblocker: $(wc -l < app/src/main/assets/adblock.txt) Adressen"
+
+      - name: Versionsnummer festlegen
+        run: echo "VC=$(( $(date +%s) / 60 ))" >> $GITHUB_ENV
+
       - name: APK bauen
-        run: gradle assembleRelease --stacktrace -PbuildNumber=${{ github.run_number }} -PgithubRepo=${{ github.repository }}
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: gradle assembleRelease --stacktrace -PbuildNumber=${{ github.run_number }} -PversionCode=${{ env.VC }} -PgithubRepo=${{ github.repository }}
+
+      - name: Schlüssel wieder entfernen
+        if: always()
+        run: rm -f app/release.jks
 
       - name: APK umbenennen
         run: cp app/build/outputs/apk/release/*.apk Tresor-1.${{ github.run_number }}.apk
@@ -41,7 +70,7 @@ jobs:
       - name: Release veröffentlichen
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ github.run_number }}
+          tag_name: v${{ env.VC }}
           name: Tresor 1.${{ github.run_number }}
           body: Automatischer Build ${{ github.run_number }}
           files: Tresor-1.${{ github.run_number }}.apk
