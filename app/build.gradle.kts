@@ -4,6 +4,24 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+// Signierschlüssel kommt aus GitHub Secrets (nie im Repo!).
+// Fehlt er (z. B. lokaler Test-Build), wird mit dem Debug-Schlüssel signiert.
+val ksFile: File = file("release.jks")
+val ksPass: String? = System.getenv("KEYSTORE_PASSWORD")
+val hasReleaseKey = ksFile.exists() && !ksPass.isNullOrEmpty()
+
+// Fingerabdruck (SHA-256) des Signier-Zertifikats → die App prüft beim Start, ob sie echt ist
+val certSha256: String = if (hasReleaseKey) {
+    try {
+        val ks = java.security.KeyStore.getInstance("PKCS12")
+        ksFile.inputStream().use { ks.load(it, ksPass!!.toCharArray()) }
+        val cert = ks.getCertificate("tresor")
+        java.security.MessageDigest.getInstance("SHA-256").digest(cert.encoded).joinToString("") { "%02x".format(it) }
+    } catch (e: Exception) {
+        ""
+    }
+} else ""
+
 android {
     namespace = "app.glass.tresor"
     compileSdk = 35
@@ -13,18 +31,17 @@ android {
         minSdk = 30
         targetSdk = 35
         // GitHub setzt die Build-Nummer automatisch → jede neue Version hat eine höhere Nummer
+        // Versionsnummer = Minuten seit 1970 → steigt immer, egal welches Repo oder welcher Zähler
         val build = (project.findProperty("buildNumber") as String?)?.toIntOrNull() ?: 1
-        versionCode = build
+        val code = (project.findProperty("versionCode") as String?)?.toIntOrNull()
+            ?: (System.currentTimeMillis() / 60_000L).toInt()
+        versionCode = code
         versionName = "1.$build"
         val repo = (project.findProperty("githubRepo") as String?) ?: ""
         buildConfigField("String", "GITHUB_REPO", "\"$repo\"")
+        buildConfigField("String", "CERT_SHA256", "\"$certSha256\"")
     }
 
-    // Signierschlüssel kommt aus GitHub Secrets (nie im Repo!).
-    // Fehlt er (z. B. lokaler Test-Build), wird mit dem Debug-Schlüssel signiert.
-    val ksFile = file("release.jks")
-    val ksPass = System.getenv("KEYSTORE_PASSWORD")
-    val hasReleaseKey = ksFile.exists() && !ksPass.isNullOrEmpty()
     signingConfigs {
         if (hasReleaseKey) {
             create("tresor") {
@@ -38,7 +55,10 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // Code verschleiern und verkleinern (R8)
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = if (hasReleaseKey) signingConfigs.getByName("tresor") else signingConfigs.getByName("debug")
         }
     }

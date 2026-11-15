@@ -125,6 +125,25 @@ object App {
     @Volatile
     var lastShare = 0L
 
+    /** false = Die App wurde mit einem fremden Schlüssel signiert (verändert / gefälschter Nachbau). */
+    var genuine = true
+
+    /** Vergleicht den Fingerabdruck des Signier-Zertifikats mit dem, der beim Bauen eingetragen wurde. */
+    private fun checkSignature(): Boolean {
+        val expected = BuildConfig.CERT_SHA256
+        if (expected.isEmpty()) return true // Test-Build ohne Release-Schlüssel
+        return try {
+            val info = ctx.packageManager.getPackageInfo(ctx.packageName, PackageManager.GET_SIGNING_CERTIFICATES)
+            val signers = info.signingInfo?.apkContentsSigners ?: return false
+            signers.any { s ->
+                java.security.MessageDigest.getInstance("SHA-256").digest(s.toByteArray())
+                    .joinToString("") { "%02x".format(it) } == expected
+            }
+        } catch (e: Exception) {
+            false
+        }
+    }
+
     var secure by mutableStateOf(true)
     var motionLock by mutableStateOf(false)
     var wipeAfter10 by mutableStateOf(false)
@@ -134,6 +153,7 @@ object App {
         ctx = c.applicationContext
         prefs = ctx.getSharedPreferences("cfg", Context.MODE_PRIVATE)
         dprefs = ctx.getSharedPreferences("disguise_data", Context.MODE_PRIVATE)
+        genuine = checkSignature()
         loadVaults()
         secure = prefs.getBoolean("secure", true)
         motionLock = prefs.getBoolean("motion", false)
@@ -303,6 +323,7 @@ object App {
         ThumbCache.clearAll()
         app.glass.tresor.chat.ChatService.stop(ctx)
         crypticShred()
+        genuine = checkSignature()
         loadVaults()
         removePanicCode()
         prefs.edit().remove("wipe10").putInt("failed", 0).putLong("lockout", 0L).apply()
@@ -334,6 +355,7 @@ object App {
         vaults.forEach { it.lock() }
         app.glass.tresor.chat.ChatService.stop(ctx)
         crypticShred()
+        genuine = checkSignature()
         loadVaults()
         removePanicCode()
         ThumbCache.clearAll()

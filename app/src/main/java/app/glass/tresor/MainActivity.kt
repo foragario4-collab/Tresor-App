@@ -145,6 +145,11 @@ private fun Root() {
         }
     }
 
+    if (!App.genuine) {
+        TamperedScreen()
+        return
+    }
+
     Box(Modifier.fillMaxSize().background(G.bg)) {
         AnimatedContent(
             targetState = nav.top,
@@ -185,6 +190,27 @@ private fun Root() {
             }
         }
         Toast(Modifier.align(Alignment.BottomCenter))
+    }
+}
+
+/** Wird gezeigt, wenn die App verändert und neu signiert wurde. Der Tresor bleibt dann zu. */
+@Composable
+private fun TamperedScreen() {
+    app.glass.tresor.ui.GlassBackground {
+        androidx.compose.foundation.layout.Column(
+            Modifier.fillMaxSize().padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center
+        ) {
+            androidx.compose.material3.Icon(app.glass.tresor.ui.Ic.shield, null, tint = G.red, modifier = Modifier.padding(bottom = 16.dp))
+            Text("Diese App wurde verändert", style = G.title2)
+            androidx.compose.foundation.layout.Spacer(Modifier.padding(6.dp))
+            Text(
+                "Sie ist nicht mit dem echten Schlüssel signiert. Das kann ein gefälschter Nachbau sein. Zu deinem Schutz bleibt der Tresor gesperrt. Lösche diese App und installiere die echte Version aus deinem GitHub-Repo.",
+                style = G.callout.copy(color = G.dim),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+        }
     }
 }
 

@@ -131,6 +131,22 @@ object Updater {
         )
     }
 
+    /**
+     * Prüft vor der Installation, ob die neue APK mit demselben Schlüssel signiert ist.
+     * Ist sie es nicht, würde Android das Update ablehnen.
+     */
+    fun sameSigner(ctx: Context, apk: File): Boolean = try {
+        val pm = ctx.packageManager
+        val flags = android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES
+        val newInfo = pm.getPackageArchiveInfo(apk.absolutePath, flags)?.signingInfo
+        val curInfo = pm.getPackageInfo(ctx.packageName, flags).signingInfo
+        val a = newInfo?.apkContentsSigners?.map { it.toCharsString() }?.toSet()
+        val b = curInfo?.apkContentsSigners?.map { it.toCharsString() }?.toSet()
+        a == null || b == null || a == b
+    } catch (e: Exception) {
+        true
+    }
+
     fun install(ctx: Context, apk: File) {
         val i = Intent(Intent.ACTION_VIEW)
             .setDataAndType(fileUri(ctx, apk), "application/vnd.android.package-archive")

@@ -488,7 +488,13 @@ private fun UpdateSection() {
                 runCatching { up.download(ctx, rel) { p -> scope.launch { progress = p } } }
             }
             progress = null
-            f.onSuccess { up.install(ctx, it) }.onFailure { status = it.message ?: "Download fehlgeschlagen." }
+            f.onSuccess { apk ->
+                if (up.sameSigner(ctx, apk)) up.install(ctx, apk)
+                else {
+                    release = null
+                    status = "Diese Version ist mit einem anderen Schlüssel signiert (seit dem Sicherheits-Update). Android kann sie nicht drüber installieren: Tresor-Inhalt sichern, App einmal deinstallieren und die neue APK von GitHub installieren. Danach klappen Updates wieder."
+                }
+            }.onFailure { status = it.message ?: "Download fehlgeschlagen." }
         }
     }
 
