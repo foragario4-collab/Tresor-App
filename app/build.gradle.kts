@@ -86,7 +86,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 
     // Chat: Tor (Onion-Dienste), Schlüsselaustausch X25519, QR-Codes
-    implementation("info.guardianproject:tor-android:0.4.9.12")
+    implementation("info.guardianproject:tor-android:0.4.8.16")
     implementation("info.guardianproject:jtorctl:0.4.5.7")
     implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
     implementation("com.google.zxing:core:3.5.3")
