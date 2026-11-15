@@ -61,10 +61,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.glass.tresor.App
 import app.glass.tresor.Screen
+import android.content.pm.PackageManager
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.core.content.ContextCompat
+import app.glass.tresor.chat.Calls
 import app.glass.tresor.chat.ChatEngine
 import app.glass.tresor.chat.ChatService
 import app.glass.tresor.chat.Contact
 import app.glass.tresor.chat.Msg
+import app.glass.tresor.chat.VoicePlayer
+import app.glass.tresor.chat.VoiceRecorder
 import app.glass.tresor.ui.ConfirmSheet
 import app.glass.tresor.ui.G
 import app.glass.tresor.ui.GlassBackground
@@ -344,6 +353,58 @@ fun ChatThreadScreen(contactId: String) {
     var toDelete by remember { mutableStateOf<Msg?>(null) }
     var rename by remember { mutableStateOf("") }
     val list = rememberLazyListState()
+    val ctx = LocalContext.current
+    val recorder = remember { VoiceRecorder(ctx) }
+    var recording by remember { mutableStateOf(false) }
+    var recMs by remember { mutableLongStateOf(0L) }
+    var permFor by remember { mutableStateOf(0) } // 1 = Sprachnachricht, 2 = Anruf
+
+    fun startRec() {
+        VoicePlayer.stop()
+        if (recorder.start()) { recording = true; recMs = 0 } else App.toast("Aufnahme nicht möglich")
+    }
+
+    fun sendRec() {
+        val c = engine.contacts.firstOrNull { it.id == contactId } ?: return
+        recording = false
+        val r = recorder.stop()
+        if (r == null) App.toast("Zu kurz – zum Aufnehmen etwas länger sprechen")
+        else if (!engine.sendVoice(c, r.first, r.second)) App.toast("Sprachnachricht zu groß")
+    }
+
+    val micPerm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        App.suppressLock = false
+        if (!granted) {
+            App.toast("Mikrofon ist nicht erlaubt")
+        } else {
+            val c = engine.contacts.firstOrNull { it.id == contactId }
+            when (permFor) {
+                1 -> startRec()
+                2 -> if (c != null) Calls.call(engine, c)
+            }
+        }
+    }
+
+    fun withMic(what: Int, action: () -> Unit) {
+        if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) action()
+        else {
+            permFor = what
+            App.suppressLock = true
+            micPerm.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    // Aufnahme-Zeit anzeigen, bei 5 Minuten automatisch senden
+    LaunchedEffect(recording) {
+        while (recording) {
+            recMs = recorder.elapsed
+            if (recMs >= ChatEngine.MAX_VOICE_MS - 300) { sendRec(); break }
+            delay(200)
+        }
+    }
+    DisposableEffect(Unit) {
+        onDispose { recorder.cancel(); VoicePlayer.stop() }
+    }
 
     SyncLoop(engine)
 
@@ -357,6 +418,8 @@ fun ChatThreadScreen(contactId: String) {
     GlassBackground {
         Column(Modifier.fillMaxSize().imePadding()) {
             TopBar(onBack = { App.nav.pop() }) {
+                GlassIconButton(Ic.phone, "Anrufen") { withMic(2) { Calls.call(engine, contact) } }
+                Spacer(Modifier.width(8.dp))
                 Row(
                     Modifier.pressable(Pill) { rename = contact.name; info = true }.glass(Pill).padding(horizontal = 14.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -378,32 +441,70 @@ fun ChatThreadScreen(contactId: String) {
                         style = G.footnote, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(24.dp)
                     )
                 }
-                items(thread, key = { it.id }) { m -> Bubble(m) { toDelete = m } }
+                items(thread, key = { it.id }) { m ->
+                    when (m.kind) {
+                        Msg.KIND_CALL -> CallLine(m)
+                        Msg.KIND_VOICE -> VoiceBubble(m, engine) { toDelete = m }
+                        else -> Bubble(m) { toDelete = m }
+                    }
+                }
             }
             Row(
                 Modifier.fillMaxWidth().navigationBarsPadding().padding(12.dp),
                 verticalAlignment = Alignment.Bottom
             ) {
-                Box(
-                    Modifier.weight(1f).heightIn(min = 48.dp).glass(sq(24)).padding(horizontal = 16.dp, vertical = 13.dp)
-                ) {
-                    if (text.isEmpty()) Text("Nachricht", style = G.body.copy(color = G.faint))
-                    BasicTextField(
-                        value = text, onValueChange = { text = it.take(5000) },
-                        textStyle = G.body, cursorBrush = SolidColor(G.accentText), maxLines = 6,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-                Spacer(Modifier.width(8.dp))
-                Box(
-                    Modifier.size(48.dp)
-                        .pressable(CircleShape, enabled = text.isNotBlank(), scaleTo = 0.9f, highlight = 0f, haptic = Haptic.CONFIRM) {
-                            engine.send(contact, text); text = ""
-                        }
-                        .clip(CircleShape).background(if (text.isNotBlank()) G.accent else Color.White.copy(alpha = 0.14f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Ic.send, "Senden", tint = Color.White, modifier = Modifier.size(22.dp))
+                if (recording) {
+                    // Aufnahme läuft
+                    Row(
+                        Modifier.weight(1f).height(48.dp).glass(sq(24)).padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(Modifier.size(10.dp).clip(CircleShape).background(G.red))
+                        Spacer(Modifier.width(10.dp))
+                        Text(Calls.duration(recMs), style = G.body.copy(fontFamily = FontFamily.Monospace))
+                        Spacer(Modifier.width(10.dp))
+                        Text("Aufnahme …", style = G.footnote, modifier = Modifier.weight(1f), maxLines = 1)
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Box(
+                        Modifier.size(48.dp).pressable(CircleShape, scaleTo = 0.9f, highlight = 0f) { recording = false; recorder.cancel() }
+                            .clip(CircleShape).background(Color.White.copy(alpha = 0.14f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Ic.trash, "Verwerfen", tint = Color.White, modifier = Modifier.size(20.dp))
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Box(
+                        Modifier.size(48.dp).pressable(CircleShape, scaleTo = 0.9f, highlight = 0f, haptic = Haptic.CONFIRM) { sendRec() }
+                            .clip(CircleShape).background(G.accent),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Ic.send, "Senden", tint = Color.White, modifier = Modifier.size(22.dp))
+                    }
+                } else {
+                    Box(
+                        Modifier.weight(1f).heightIn(min = 48.dp).glass(sq(24)).padding(horizontal = 16.dp, vertical = 13.dp)
+                    ) {
+                        if (text.isEmpty()) Text("Nachricht", style = G.body.copy(color = G.faint))
+                        BasicTextField(
+                            value = text, onValueChange = { text = it.take(5000) },
+                            textStyle = G.body, cursorBrush = SolidColor(G.accentText), maxLines = 6,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    val canSend = text.isNotBlank()
+                    Box(
+                        Modifier.size(48.dp)
+                            .pressable(CircleShape, scaleTo = 0.9f, highlight = 0f, haptic = Haptic.CONFIRM) {
+                                if (canSend) { engine.send(contact, text); text = "" } else withMic(1) { startRec() }
+                            }
+                            .clip(CircleShape).background(if (canSend) G.accent else Color.White.copy(alpha = 0.14f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (canSend) Icon(Ic.send, "Senden", tint = Color.White, modifier = Modifier.size(22.dp))
+                        else Icon(Ic.mic, "Sprachnachricht aufnehmen", tint = Color.White, modifier = Modifier.size(22.dp))
+                    }
                 }
             }
         }
@@ -457,6 +558,63 @@ private fun Bubble(m: Msg, onLong: () -> Unit) {
                     Icon(if (m.state == 0) Ic.clock else Ic.check, if (m.state == 0) "wartet" else "zugestellt", tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(12.dp))
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun VoiceBubble(m: Msg, engine: ChatEngine, onLong: () -> Unit) {
+    val playing = VoicePlayer.playingId == m.id
+    var progress by remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(playing) {
+        progress = 0f
+        while (playing) {
+            progress = VoicePlayer.progress()
+            delay(100)
+        }
+    }
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = if (m.mine) Arrangement.End else Arrangement.Start) {
+        Column(
+            Modifier.width(250.dp)
+                .pressable(sq(20), scaleTo = 0.98f, highlight = 0.08f, haptic = Haptic.NONE, onLongClick = onLong) {
+                    VoicePlayer.toggle(m.id) { engine.voiceData(m) }
+                }
+                .then(if (m.mine) Modifier.clip(sq(20)).background(G.accent) else Modifier.glass(sq(20)))
+                .padding(start = 10.dp, end = 14.dp, top = 9.dp, bottom = 9.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier.size(36.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.22f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(if (playing) Ic.pause else Ic.play, if (playing) "Pause" else "Abspielen", tint = Color.White, modifier = Modifier.size(18.dp))
+                }
+                Spacer(Modifier.width(10.dp))
+                Box(Modifier.weight(1f).height(4.dp).clip(Pill).background(Color.White.copy(alpha = 0.3f))) {
+                    Box(Modifier.fillMaxHeight().fillMaxWidth(progress.coerceIn(0f, 1f)).clip(Pill).background(Color.White))
+                }
+                Spacer(Modifier.width(10.dp))
+                Text(Calls.duration(m.dur), style = G.footnote.copy(color = Color.White))
+            }
+            Row(Modifier.align(Alignment.End), verticalAlignment = Alignment.CenterVertically) {
+                Text(timeOf(m.ts), style = G.footnote.copy(fontSize = 11.sp, color = Color.White.copy(alpha = 0.7f)))
+                if (m.mine) {
+                    Spacer(Modifier.width(4.dp))
+                    Icon(if (m.state == 0) Ic.clock else Ic.check, if (m.state == 0) "wartet" else "zugestellt", tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(12.dp))
+                }
+            }
+        }
+    }
+}
+
+/** Anruf im Verlauf: kleine Zeile in der Mitte. */
+@Composable
+private fun CallLine(m: Msg) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.Center) {
+        Row(Modifier.glass(Pill).padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Ic.phone, null, tint = if (m.text.startsWith("Verpasst")) G.red else G.dim, modifier = Modifier.size(14.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(m.text + " · " + timeOf(m.ts), style = G.footnote.copy(fontSize = 12.sp))
         }
     }
 }
@@ -538,6 +696,8 @@ fun ChatTipsScreen() {
                 TipLine(Ic.clock, "Beide müssen online sein", "Eine Nachricht kommt an, sobald beide Handys gleichzeitig online sind. Bis dahin wartet sie verschlüsselt auf deinem Handy (Uhr-Symbol).")
                 TipLine(Ic.lock, "Sicherheitsnummer vergleichen", "Tippt im Gespräch auf den Namen und vergleicht die Nummer. Stimmt sie überein, schreibt ihr garantiert miteinander.")
                 TipLine(Ic.shield, "Jeder Tresor hat seinen eigenen Chat", "Kontakte und Nachrichten eines Tresors sind in den anderen Tresoren unsichtbar.")
+                TipLine(Ic.mic, "Sprachnachrichten", "Mikrofon-Taste tippen, sprechen, senden. Bis zu 5 Minuten. Die Aufnahme liegt danach nur verschlüsselt im Tresor.")
+                TipLine(Ic.phone, "Anrufe über Tor", "Ohne Server und ohne Telefonnummer. Über Tor kommt die Sprache etwas verzögert an, ungefähr eine Sekunde. Ein Anruf klingelt auch bei gesperrtem Tresor, annehmen kannst du ihn nach dem Entsperren. Verlässt du die App, endet das Gespräch.")
             }
             SectionLabel("iPhone")
             Column(Modifier.fillMaxWidth().glass(sq(24)).padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

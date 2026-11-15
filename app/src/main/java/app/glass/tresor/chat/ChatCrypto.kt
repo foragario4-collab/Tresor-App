@@ -34,6 +34,9 @@ object ChatCrypto {
         return KeyPair(p.encoded, p.generatePublicKey().encoded)
     }
 
+    /** Diffie-Hellman (X25519), auch für Anrufe genutzt. */
+    fun agree(priv: ByteArray, pub: ByteArray): ByteArray = dh(priv, pub)
+
     private fun dh(priv: ByteArray, pub: ByteArray): ByteArray {
         val a = X25519Agreement()
         a.init(X25519PrivateKeyParameters(priv, 0))

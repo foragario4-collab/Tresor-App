@@ -240,8 +240,13 @@ object App {
                 else -> null
             }
         }.toSet()
+        // Per Code / Fingerabdruck hervorgeholte Ordner bleiben offen, solange man in der Ordner-Übersicht ist.
+        // Verlässt man sie, verschwinden ausgeblendete Ordner wieder.
+        val inAlbums = nav.stack.any { it is Screen.Albums }
+        if (!inAlbums) v.hideRevealed()
+        val keep = if (inAlbums) v.revealed.toSet() else emptySet()
         v.folders.toList()
-            .filter { it.isProtected && it.relock && it.id !in used && v.isFolderUnlocked(it.id) }
+            .filter { it.isProtected && it.relock && it.id !in used && it.id !in keep && v.isFolderUnlocked(it.id) }
             .forEach { v.relockFolder(it.id) }
     }
 
@@ -265,6 +270,8 @@ object App {
     fun lock() {
         if (vault == null && nav.top == Screen.Disguise) return
         beforeLock.toList().forEach { it() }
+        app.glass.tresor.chat.Calls.onVaultLocked()
+        app.glass.tresor.chat.VoicePlayer.stop()
         app.glass.tresor.chat.ChatEngine.close()
         vaults.forEach { it.lock() }
         ThumbCache.clearAll()
@@ -336,6 +343,7 @@ object App {
         HwKeys.delete(HwKeys.PEPPER_ALIAS)
         HwKeys.deletePrefix("tresor_vault_")
         HwKeys.deletePrefix("tresor_f_")
+        HwKeys.deletePrefix("tresor_fg_")
         File(ctx.filesDir, "chat").let { if (it.exists()) it.renameTo(File(ctx.filesDir, "trash_chat_${System.nanoTime()}")) }
         File(ctx.filesDir, "tor").let { if (it.exists()) it.renameTo(File(ctx.filesDir, "trash_tor_${System.nanoTime()}")) }
         val dir = File(ctx.filesDir, "vaults")

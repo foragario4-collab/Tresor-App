@@ -19,6 +19,15 @@
 # Media3 (Videoplayer)
 -dontwarn androidx.media3.**
 
+# Nur beim Kompilieren gebrauchte Hinweis-Klassen, fehlen zur Laufzeit absichtlich
+# (sonst bricht R8 mit "Missing classes detected" ab)
+-dontwarn javax.annotation.**
+-dontwarn com.google.errorprone.annotations.**
+-dontwarn org.jetbrains.annotations.**
+-dontwarn org.slf4j.**
+-dontwarn org.conscrypt.**
+-dontwarn org.openjsse.**
+
 # Native Methoden nie umbenennen
 -keepclasseswithmembernames class * {
     native <methods>;

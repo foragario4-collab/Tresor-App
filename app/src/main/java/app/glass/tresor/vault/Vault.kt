@@ -36,11 +36,20 @@ class Vault(val slot: String, val dir: File) {
     val items = mutableStateMapOf<String, List<Item>>()
     val unlockedFolders = mutableStateListOf<String>()
 
+    /** Ordner, die gerade per Code oder Fingerabdruck hervorgeholt wurden (nur im Speicher). */
+    val revealed = mutableStateListOf<String>()
+
+    /** Gemeinsamer Fingerabdruck-Schlüssel aller Systemsperre-Ordner: ein Abdruck öffnet alle. */
+    @Volatile
+    private var sysGroup: JSONObject? = null
+
     private val aadVault get() = "tresor-vault-$slot".toByteArray()
     private val aadRoot = "tresor-root".toByteArray()
     private fun faad(id: String) = "folder-$id".toByteArray()
     private fun bioAlias() = "tresor_vault_$slot"
     private fun folderAlias(id: String) = "tresor_f_${slot}_$id"
+    private fun groupAlias() = "tresor_fg_$slot"
+    private fun gaad(id: String) = "sysg-$id".toByteArray()
 
     val isUnlocked get() = mk != null
     fun exists() = headerFile.exists()
@@ -187,6 +196,8 @@ class Vault(val slot: String, val dir: File) {
         folders.clear()
         items.clear()
         unlockedFolders.clear()
+        revealed.clear()
+        sysGroup = null
         ThumbCache.clearSlot(slot)
     }
 
@@ -199,8 +210,10 @@ class Vault(val slot: String, val dir: File) {
         }
         File(dir, "f").deleteRecursively()
         File(dir, "blobs").deleteRecursively()
+        HwKeys.delete(groupAlias())
+        sysGroup = null
         fkeys.values.forEach { Crypto.wipe(it) }
-        fkeys.clear(); folders.clear(); items.clear(); unlockedFolders.clear()
+        fkeys.clear(); folders.clear(); items.clear(); unlockedFolders.clear(); revealed.clear()
         ThumbCache.clearSlot(slot)
         newFolderInternal("Fotos", FolderKind.MEDIA)
         newFolderInternal("Dateien", FolderKind.FILES)
@@ -229,6 +242,10 @@ class Vault(val slot: String, val dir: File) {
         Crypto.writeAtomic(blobFile(name), Crypto.seal(k, data, "blob-$slot-$name".toByteArray()))
     }
 
+    fun deleteBlob(name: String) {
+        blobFile(name).delete()
+    }
+
     /** Ordner für Downloads finden oder anlegen. */
     @Synchronized
     fun ensureFolder(name: String, kind: FolderKind): Folder =
@@ -238,6 +255,7 @@ class Vault(val slot: String, val dir: File) {
         lock()
         dir.deleteRecursively()
         HwKeys.delete(bioAlias())
+        HwKeys.delete(groupAlias())
         HwKeys.deletePrefix("tresor_f_${slot}_")
     }
 
@@ -245,9 +263,12 @@ class Vault(val slot: String, val dir: File) {
 
     private fun loadRoot() {
         val k = mk ?: return
-        val arr = if (rootFile.exists()) {
-            JSONObject(String(Crypto.open(k, rootFile.readBytes(), aadRoot))).getJSONArray("folders")
-        } else JSONArray()
+        val root = if (rootFile.exists()) {
+            JSONObject(String(Crypto.open(k, rootFile.readBytes(), aadRoot)))
+        } else JSONObject().put("folders", JSONArray())
+        val arr = root.getJSONArray("folders")
+        sysGroup = root.optJSONObject("sysg")
+        revealed.clear()
         val list = (0 until arr.length()).map { Folder.fromJson(arr.getJSONObject(it)) }
         fkeys.values.forEach { Crypto.wipe(it) }
         fkeys.clear()
@@ -270,7 +291,9 @@ class Vault(val slot: String, val dir: File) {
         val k = mk ?: return
         val arr = JSONArray()
         folders.forEach { arr.put(it.toJson()) }
-        val json = JSONObject().put("folders", arr).toString().toByteArray()
+        val root = JSONObject().put("folders", arr)
+        sysGroup?.let { root.put("sysg", it) }
+        val json = root.toString().toByteArray()
         Crypto.writeAtomic(rootFile, Crypto.seal(k, json, aadRoot))
     }
 
@@ -342,6 +365,8 @@ class Vault(val slot: String, val dir: File) {
     fun setHidden(id: String, hidden: Boolean) {
         val f = folder(id) ?: return
         replaceFolder(f.copy(hidden = hidden))
+        // Gerade offen → bleibt sichtbar, bis man die Ordner-Übersicht verlässt
+        if (hidden && f.id !in revealed) revealed.add(f.id)
         saveRoot()
     }
 
@@ -358,6 +383,7 @@ class Vault(val slot: String, val dir: File) {
         items.remove(id)
         fkeys.remove(id)?.let { Crypto.wipe(it) }
         unlockedFolders.remove(id)
+        revealed.remove(id)
         folderDir(id).deleteRecursively()
         HwKeys.delete(folderAlias(id))
         ThumbCache.evictFolder(slot, id)
@@ -377,23 +403,183 @@ class Vault(val slot: String, val dir: File) {
         return true
     }
 
-    fun folderSysCipher(id: String): Cipher? = try {
-        val o = JSONObject(folder(id)!!.wrapSys!!)
-        HwKeys.decryptCipher(folderAlias(id), Crypto.unb64(o.getString("iv")))
+    /** Neues Format: Ordner-Schlüssel liegt mit dem gemeinsamen Fingerabdruck-Schlüssel verschlüsselt. */
+    private fun isGroupWrapped(f: Folder) = f.wrapSys?.let {
+        try { JSONObject(it).has("g") } catch (e: Exception) { false }
+    } ?: false
+
+    /** Ordner hängt am aktuellen Fingerabdruck-Schlüssel (nicht an einem alten, ungültig gewordenen). */
+    private fun inCurrentGroup(f: Folder): Boolean = try {
+        val g = sysGroup?.getString("id")
+        g != null && JSONObject(f.wrapSys!!).optString("g") == g
     } catch (e: Exception) {
-        null // z. B. Fingerabdrücke geändert → Ordner mit dem Tresor-Code öffnen
+        false
     }
 
-    fun unlockFolderSys(id: String, c: Cipher): Boolean = try {
-        val o = JSONObject(folder(id)!!.wrapSys!!)
-        val fk = c.doFinal(Crypto.unb64(o.getString("ct")))
+    /** true = der gemeinsame Fingerabdruck-Schlüssel ist eingerichtet und noch gültig. */
+    fun sysGroupUsable(): Boolean = sysGroup != null && sysGroupUnlockCipher() != null
+
+    /** Cipher zum Öffnen aller Systemsperre-Ordner (null = keiner eingerichtet oder Abdrücke geändert). */
+    fun sysGroupUnlockCipher(): Cipher? = try {
+        val g = sysGroup ?: throw IllegalStateException()
+        HwKeys.decryptCipher(groupAlias(), Crypto.unb64(g.getString("iv")))
+    } catch (e: android.security.keystore.KeyPermanentlyInvalidatedException) {
+        // Fingerabdrücke geändert → Systemsperre-Ordner gehen weiter mit dem Tresor-Code
+        null
+    } catch (e: Exception) {
+        null
+    }
+
+    /**
+     * Cipher für die Fingerabdruck-Abfrage. Gibt es den gemeinsamen Schlüssel schon, wird er
+     * entschlüsselt, sonst neu angelegt (oder ersetzt, falls er ungültig geworden ist).
+     */
+    fun sysGroupCipher(): Cipher? {
+        sysGroupUnlockCipher()?.let { return it }
+        return try {
+            HwKeys.delete(groupAlias())
+            HwKeys.encryptCipher(groupAlias(), true)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /** Holt den gemeinsamen Schlüssel aus dem bestätigten Cipher (legt ihn beim ersten Mal an). */
+    @Synchronized
+    private fun groupKeyFrom(c: Cipher, allowCreate: Boolean): ByteArray? = try {
+        val g = sysGroup
+        // Gleiche IV wie gespeichert = Entschlüsseln; neue zufällige IV = Schlüssel wird neu angelegt
+        if (g != null && c.iv.contentEquals(Crypto.unb64(g.getString("iv")))) {
+            c.doFinal(Crypto.unb64(g.getString("ct")))
+        } else if (!allowCreate) {
+            null
+        } else {
+            val gk = Crypto.random(32)
+            val ct = c.doFinal(gk)
+            sysGroup = JSONObject()
+                .put("id", Crypto.b64(Crypto.random(8)))
+                .put("iv", Crypto.b64(c.iv))
+                .put("ct", Crypto.b64(ct))
+            saveRoot()
+            gk
+        }
+    } catch (e: Exception) {
+        null
+    }
+
+    /** Fingerabdruck-Abfrage für einen einzelnen Ordner. */
+    fun folderSysCipher(id: String): Cipher? {
+        val f = folder(id) ?: return null
+        if (isGroupWrapped(f)) return sysGroupUnlockCipher()
+        return try {
+            val o = JSONObject(f.wrapSys!!)
+            HwKeys.decryptCipher(folderAlias(id), Crypto.unb64(o.getString("iv")))
+        } catch (e: Exception) {
+            null // z. B. Fingerabdrücke geändert → Ordner mit dem Tresor-Code öffnen
+        }
+    }
+
+    private fun openFolderKey(id: String, fk: ByteArray) {
         synchronized(this) {
             fkeys[id] = fk
             loadIndex(id)
         }
+    }
+
+    /** Ordner-Schlüssel mit dem gemeinsamen Schlüssel auspacken (null = passt nicht). */
+    private fun unwrapGroup(f: Folder, gk: ByteArray): ByteArray? = try {
+        val o = JSONObject(f.wrapSys!!)
+        if (o.getString("g") != sysGroup?.getString("id")) null
+        else Crypto.open(gk, Crypto.unb64(o.getString("ct")), gaad(f.id))
+    } catch (e: Exception) {
+        null
+    }
+
+    fun unlockFolderSys(id: String, c: Cipher): Boolean = try {
+        val f = folder(id)!!
+        if (isGroupWrapped(f)) {
+            val gk = groupKeyFrom(c, false) ?: throw IllegalStateException()
+            try {
+                val fk = unwrapGroup(f, gk) ?: throw IllegalStateException()
+                openFolderKey(id, fk)
+            } finally {
+                Crypto.wipe(gk)
+            }
+        } else {
+            val o = JSONObject(f.wrapSys!!)
+            openFolderKey(id, c.doFinal(Crypto.unb64(o.getString("ct"))))
+        }
         true
     } catch (e: Exception) {
         false
+    }
+
+    /** Ein Fingerabdruck → alle Systemsperre-Ordner dieser Art öffnen. Gibt die geöffneten IDs zurück. */
+    fun unlockAllSys(c: Cipher, kind: FolderKind): List<String> {
+        val gk = groupKeyFrom(c, false) ?: return emptyList()
+        val opened = mutableListOf<String>()
+        try {
+            for (f in folders.toList()) {
+                if (f.kind != kind || f.protection != Protection.SYSTEM || !isGroupWrapped(f)) continue
+                if (!isFolderUnlocked(f.id)) {
+                    val fk = unwrapGroup(f, gk) ?: continue
+                    openFolderKey(f.id, fk)
+                }
+                opened += f.id
+            }
+        } finally {
+            Crypto.wipe(gk)
+        }
+        markRevealed(opened)
+        return opened
+    }
+
+    /**
+     * Ein Code → genau die Ordner dieser Art öffnen, die mit diesem Code geschützt sind.
+     * Der Tresor-Code holt außerdem ausgeblendete Ordner ohne extra Schutz hervor.
+     * Systemsperre-Ordner öffnen sich nur per Code, wenn der Fingerabdruck nicht (mehr) geht.
+     */
+    fun unlockByCode(code: CharArray, kind: FolderKind): List<String> {
+        val isVaultCode = verifyPin(code)
+        val sysWorks = sysGroupUsable()
+        val opened = mutableListOf<String>()
+        for (f in folders.toList()) {
+            if (f.kind != kind) continue
+            when (f.protection) {
+                Protection.NONE -> if (isVaultCode && f.hidden) opened += f.id
+                Protection.PIN -> if (isVaultCode) {
+                    if (isFolderUnlocked(f.id) || unlockFolderSecret(f.id, code)) opened += f.id
+                }
+                Protection.SYSTEM -> if (isVaultCode && !(sysWorks && inCurrentGroup(f))) {
+                    if (isFolderUnlocked(f.id) || unlockFolderSecret(f.id, code)) opened += f.id
+                }
+                Protection.PASSWORD -> {
+                    // Jeder Ordner hat sein eigenes Salz → jeder wird einzeln geprüft
+                    val ok = if (isFolderUnlocked(f.id)) checkSecret(f, code) else unlockFolderSecret(f.id, code)
+                    if (ok) opened += f.id
+                }
+            }
+        }
+        markRevealed(opened)
+        return opened
+    }
+
+    private fun checkSecret(f: Folder, code: CharArray): Boolean {
+        val w = f.wrapPw ?: return false
+        val k = unwrapSecret(w, code, faad(f.id)) ?: return false
+        Crypto.wipe(k)
+        return true
+    }
+
+    @Synchronized
+    private fun markRevealed(ids: List<String>) {
+        ids.forEach { if (it !in revealed) revealed.add(it) }
+    }
+
+    /** Hervorgeholte Ordner wieder verstecken (beim Verlassen der Übersicht). */
+    @Synchronized
+    fun hideRevealed() {
+        revealed.clear()
     }
 
     @Synchronized
@@ -404,11 +590,6 @@ class Vault(val slot: String, val dir: File) {
         items.remove(id)
         unlockedFolders.remove(id)
         ThumbCache.evictFolder(slot, id)
-    }
-
-    fun newSysEncryptCipher(id: String): Cipher {
-        HwKeys.delete(folderAlias(id))
-        return HwKeys.encryptCipher(folderAlias(id), true)
     }
 
     /**
@@ -433,19 +614,22 @@ class Vault(val slot: String, val dir: File) {
             }
             Protection.SYSTEM -> {
                 if (secret == null || sysCipher == null || !verifyPin(secret)) return false
+                val gk = groupKeyFrom(sysCipher, true) ?: return false
+                val gid = sysGroup?.getString("id") ?: return false
                 val ct = try {
-                    sysCipher.doFinal(fk)
-                } catch (e: Exception) {
-                    return false
+                    Crypto.seal(gk, fk, gaad(id))
+                } finally {
+                    Crypto.wipe(gk)
                 }
                 nf = nf.copy(
                     wrapPw = wrapSecret(secret, fk, faad(id)),
-                    wrapSys = JSONObject().put("iv", Crypto.b64(sysCipher.iv)).put("ct", Crypto.b64(ct)).toString()
+                    wrapSys = JSONObject().put("g", gid).put("ct", Crypto.b64(ct)).toString()
                 )
             }
         }
         synchronized(this) {
-            if (prot != Protection.SYSTEM) HwKeys.delete(folderAlias(id))
+            // Alter Einzel-Schlüssel des Ordners wird nicht mehr gebraucht
+            HwKeys.delete(folderAlias(id))
             replaceFolder(nf)
             saveRoot()
         }

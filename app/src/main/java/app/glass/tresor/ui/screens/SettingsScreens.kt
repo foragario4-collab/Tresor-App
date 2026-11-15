@@ -359,7 +359,7 @@ fun FolderSettingsScreen(fid: String) {
                     }
                 }
                 GlassGroup {
-                    SettingRow("Ordner ausblenden", "Nur sichtbar nach langem Drücken auf den Titel") {
+                    SettingRow("Ordner verstecken", "Unsichtbar. Erscheint nur mit seinem Code oder Fingerabdruck") {
                         GlassSwitch(f.hidden, "Ausblenden") { vault.setHidden(fid, it) }
                     }
                     if (f.isProtected) {
@@ -369,7 +369,7 @@ fun FolderSettingsScreen(fid: String) {
                     }
                 }
                 Text(
-                    "Geschützte Ordner haben einen eigenen Schlüssel. Auch bei offenem Tresor bleiben die Dateien verschlüsselt, bis der Ordner entsperrt wird. Ausgeblendete Ordner erscheinen nicht in Suche und „Zuletzt“.",
+                    "Geschützte Ordner haben einen eigenen Schlüssel. Auch bei offenem Tresor bleiben die Dateien verschlüsselt, bis der Ordner entsperrt wird.\n\nVersteckte Ordner hervorholen: in der Ordner-Übersicht lange auf den Titel drücken und den Code eingeben. Es erscheinen genau die Ordner mit diesem Code. Ordner mit gleichem Passwort öffnen sich zusammen, „Mit Fingerabdruck“ öffnet alle mit Systemsperre. Versteckte Ordner ohne extra Schutz erscheinen mit dem Tresor-Code.",
                     style = G.footnote.copy(color = G.faint), modifier = Modifier.padding(horizontal = 4.dp)
                 )
                 Spacer(Modifier.height(6.dp))
@@ -397,7 +397,7 @@ fun FolderSettingsScreen(fid: String) {
                 else PillButton("Übernehmen", primary = true, modifier = Modifier.fillMaxWidth(), enabled = s1.length >= 4) {
                     if (isPw && s1 != s2) { err = "Stimmt nicht überein."; return@PillButton }
                     if (t == Protection.SYSTEM) {
-                        val c = try { vault.newSysEncryptCipher(fid) } catch (e: Exception) { null }
+                        val c = vault.sysGroupCipher()
                         if (c == null) { err = "Systemsperre nicht verfügbar."; return@PillButton }
                         val secret = s1
                         Auth.prompt(activity, "Systemsperre für Ordner", null, c,

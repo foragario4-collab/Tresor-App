@@ -95,13 +95,14 @@ fun protectionLabel(p: Protection) = when (p) {
 fun AlbumsScreen(kind: FolderKind, filter: ItemType?) {
     val vault = App.vault ?: return
     val view = LocalView.current
-    var showHidden by remember { mutableStateOf(false) }
+    var codeSheet by remember { mutableStateOf(false) }
     var newFolder by remember { mutableStateOf(false) }
     var unlockTarget by remember { mutableStateOf<Pair<Folder, Boolean>?>(null) } // Ordner, danach Einstellungen?
 
     val all = vault.folders.filter { it.kind == kind }
     val normal = all.filter { !it.isProtected && !it.hidden }
-    val protectedF = all.filter { (it.isProtected || it.hidden) && (!it.hidden || showHidden) }
+    // Ausgeblendete Ordner sind unsichtbar, bis ihr Code (oder der Fingerabdruck) sie hervorholt
+    val protectedF = all.filter { if (it.hidden) it.id in vault.revealed else it.isProtected }
 
     fun open(f: Folder, settings: Boolean) {
         if (vault.isFolderUnlocked(f.id)) {
@@ -123,7 +124,7 @@ fun AlbumsScreen(kind: FolderKind, filter: ItemType?) {
                         PillButton("Neuer Ordner", icon = Ic.plus, height = 44.dp) { newFolder = true }
                     }
                     Spacer(Modifier.height(14.dp))
-                    // Lange auf den Titel drücken zeigt ausgeblendete Ordner
+                    // Lange auf den Titel drücken: Code oder Fingerabdruck für versteckte Ordner
                     Text(
                         kindTitle(kind, filter),
                         style = G.largeTitle,
@@ -132,7 +133,8 @@ fun AlbumsScreen(kind: FolderKind, filter: ItemType?) {
                             indication = null,
                             onClick = {},
                             onLongClick = {
-                                showHidden = !showHidden
+                                view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                                codeSheet = true
                             }
                         )
                     )
@@ -165,6 +167,7 @@ fun AlbumsScreen(kind: FolderKind, filter: ItemType?) {
         }
 
         NewFolderSheet(newFolder, kind, onDismiss = { newFolder = false })
+        FolderCodeSheet(vault, kind, codeSheet, onDismiss = { codeSheet = false })
         FolderUnlockSheet(vault, unlockTarget?.first, onDismiss = { unlockTarget = null }) { f ->
             val toSettings = unlockTarget?.second == true
             unlockTarget = null
@@ -325,5 +328,111 @@ fun androidx.compose.foundation.layout.BoxScope.FolderUnlockSheet(
     }
     androidx.compose.runtime.LaunchedEffect(f?.id) {
         if (f?.protection == Protection.SYSTEM) trySystem()
+    }
+}
+
+/**
+ * Versteckte Ordner hervorholen: Der eingegebene Code öffnet genau die Ordner, die diesen Code haben.
+ * Der Fingerabdruck öffnet alle Ordner mit Systemsperre. Falsche Eingaben verraten nicht, ob es weitere gibt.
+ */
+@Composable
+private fun androidx.compose.foundation.layout.BoxScope.FolderCodeSheet(
+    vault: Vault,
+    kind: FolderKind,
+    visible: Boolean,
+    onDismiss: () -> Unit
+) {
+    val activity = LocalContext.current as FragmentActivity
+    val view = LocalView.current
+    val scope = rememberCoroutineScope()
+    var code by remember(visible) { mutableStateOf("") }
+    var letters by remember(visible) { mutableStateOf(false) }
+    var busy by remember(visible) { mutableStateOf(false) }
+    var error by remember(visible) { mutableStateOf<String?>(null) }
+    var wrong by remember { mutableStateOf(0) }
+    val anyRevealed = vault.revealed.any { id -> vault.folder(id)?.kind == kind }
+
+    fun done(opened: List<String>) {
+        if (opened.isEmpty()) {
+            view.performHapticFeedback(HapticFeedbackConstants.REJECT)
+            error = "Kein Ordner gefunden."
+            code = ""
+            wrong++
+        } else {
+            wrong = 0
+            onDismiss()
+            App.toast(if (opened.size == 1) "1 Ordner geöffnet" else "${opened.size} Ordner geöffnet")
+        }
+    }
+
+    fun tryCode() {
+        if (code.isEmpty() || busy) return
+        busy = true
+        val c = code.toCharArray()
+        scope.launch {
+            // Bremse gegen Durchprobieren: nach mehreren Fehlversuchen kurz warten
+            if (wrong >= 3) kotlinx.coroutines.delay(minOf(30_000L, 2_000L * (wrong - 2)))
+            val opened = withContext(Dispatchers.Default) {
+                try {
+                    vault.unlockByCode(c, kind)
+                } finally {
+                    java.util.Arrays.fill(c, '\u0000')
+                }
+            }
+            busy = false
+            done(opened)
+        }
+    }
+
+    fun tryFinger() {
+        if (busy) return
+        val c = vault.sysGroupUnlockCipher()
+        if (c == null) {
+            done(emptyList())
+            return
+        }
+        Auth.prompt(activity, "Ordner öffnen", null, c, onSuccess = { ok ->
+            scope.launch {
+                val opened = withContext(Dispatchers.Default) { vault.unlockAllSys(ok, kind) }
+                done(opened)
+            }
+        }, onFail = {})
+    }
+
+    Sheet(visible, onDismiss) {
+        SheetHeader(Ic.keypad, "Ordner öffnen", error ?: "Code eingeben – es erscheinen genau die Ordner mit diesem Code.")
+        GlassField(
+            code, { code = it; error = null },
+            "Code",
+            password = true, numeric = !letters, autoFocus = visible,
+            onDone = { tryCode() }
+        )
+        Text(
+            if (letters) "Nur Zahlen" else "Mit Buchstaben",
+            style = G.footnote.copy(color = G.dim),
+            modifier = Modifier
+                .align(Alignment.End)
+                .padding(top = 6.dp)
+                .pressable(androidx.compose.foundation.shape.RoundedCornerShape(50)) { letters = !letters }
+                .padding(horizontal = 12.dp, vertical = 8.dp)
+        )
+        Spacer(Modifier.height(8.dp))
+        Box(Modifier.fillMaxWidth().height(52.dp), contentAlignment = Alignment.Center) {
+            if (busy) CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(26.dp))
+            else PillButton("Öffnen", primary = true, enabled = code.isNotEmpty(), modifier = Modifier.fillMaxWidth()) { tryCode() }
+        }
+        if (Auth.available(activity)) {
+            Spacer(Modifier.height(10.dp))
+            PillButton("Mit Fingerabdruck", icon = Ic.fingerprint, enabled = !busy, modifier = Modifier.fillMaxWidth()) { tryFinger() }
+        }
+        if (anyRevealed) {
+            Spacer(Modifier.height(10.dp))
+            PillButton("Wieder verstecken", icon = Ic.eyeOff, modifier = Modifier.fillMaxWidth()) {
+                vault.hideRevealed()
+                App.relockUnused()
+                onDismiss()
+            }
+        }
+        Spacer(Modifier.navigationBarsPadding())
     }
 }

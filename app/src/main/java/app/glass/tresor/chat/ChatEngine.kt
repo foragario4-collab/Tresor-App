@@ -28,7 +28,15 @@ data class Msg(
     val text: String,
     val ts: Long,
     val state: Int,          // 0 = wartet, 1 = zugestellt, 2 = empfangen
-)
+    val kind: String = KIND_TEXT,
+    val dur: Long = 0,       // Länge der Sprachnachricht in ms
+) {
+    companion object {
+        const val KIND_TEXT = "text"
+        const val KIND_VOICE = "voice"
+        const val KIND_CALL = "call"
+    }
+}
 
 /** Visitenkarte im QR-Code: Onion-Adresse + öffentlicher Schlüssel + Anzeigename. */
 data class Card(val onion: String, val pub: ByteArray, val name: String) {
@@ -58,6 +66,10 @@ data class Card(val onion: String, val pub: ByteArray, val name: String) {
  */
 class ChatEngine private constructor(val vault: Vault) {
     companion object {
+        /** Sprachnachrichten: höchstens 5 Minuten / 3 MB. */
+        const val MAX_VOICE_MS = 5 * 60_000L
+        const val MAX_VOICE_BYTES = 3 * 1024 * 1024
+
         @Volatile
         private var current: ChatEngine? = null
 
@@ -106,7 +118,7 @@ class ChatEngine private constructor(val vault: Vault) {
             val ms = o.optJSONArray("msgs") ?: JSONArray()
             messages.clear()
             for (i in 0 until ms.length()) ms.getJSONObject(i).let {
-                messages.add(Msg(it.getString("id"), it.getString("c"), it.getBoolean("m"), it.getString("t"), it.getLong("ts"), it.getInt("s")))
+                messages.add(Msg(it.getString("id"), it.getString("c"), it.getBoolean("m"), it.getString("t"), it.getLong("ts"), it.getInt("s"), it.optString("k", Msg.KIND_TEXT), it.optLong("d")))
             }
         } catch (_: Exception) {
         }
@@ -124,7 +136,7 @@ class ChatEngine private constructor(val vault: Vault) {
         }
         val ms = JSONArray()
         messages.toList().forEach {
-            ms.put(JSONObject().put("id", it.id).put("c", it.contact).put("m", it.mine).put("t", it.text).put("ts", it.ts).put("s", it.state))
+            ms.put(JSONObject().put("id", it.id).put("c", it.contact).put("m", it.mine).put("t", it.text).put("ts", it.ts).put("s", it.state).put("k", it.kind).put("d", it.dur))
         }
         o.put("contacts", cs).put("msgs", ms)
         vault.writeBlob("chat", o.toString().toByteArray())
@@ -172,6 +184,17 @@ class ChatEngine private constructor(val vault: Vault) {
                         if (!card.pub.contentEquals(opened.senderPub)) continue
                         if (from == null) {
                             contacts.add(Contact(newId(), card.name.ifBlank { "Unbekannt" }, card.onion, card.pub, accepted = false, added = System.currentTimeMillis()))
+                            changed = true
+                        }
+                    }
+                    "voice" -> {
+                        if (from == null || !from.accepted) continue
+                        val id = p.getString("id")
+                        if (messages.none { it.id == id }) {
+                            val audio = Crypto.unb64(p.getString("a"))
+                            if (audio.isEmpty() || audio.size > MAX_VOICE_BYTES) continue
+                            vault.writeBlob(voiceBlob(id), audio)
+                            messages.add(Msg(id, from.id, false, "Sprachnachricht", p.optLong("ts", System.currentTimeMillis()), 2, Msg.KIND_VOICE, p.optLong("dur").coerceIn(0, MAX_VOICE_MS)))
                             changed = true
                         }
                     }
@@ -251,6 +274,7 @@ class ChatEngine private constructor(val vault: Vault) {
     }
 
     fun removeContact(c: Contact) {
+        messages.filter { it.contact == c.id && it.kind == Msg.KIND_VOICE }.forEach { vault.deleteBlob(voiceBlob(it.id)) }
         contacts.removeAll { it.id == c.id }
         messages.filter { it.contact == c.id && it.mine && it.state == 0 }.forEach { ChatSpool.cancelOutgoing(ctx, vault.slot, it.id) }
         messages.removeAll { it.contact == c.id }
@@ -272,13 +296,50 @@ class ChatEngine private constructor(val vault: Vault) {
 
     fun deleteMessage(m: Msg) {
         if (m.mine && m.state == 0) ChatSpool.cancelOutgoing(ctx, vault.slot, m.id)
+        if (m.kind == Msg.KIND_VOICE) vault.deleteBlob(voiceBlob(m.id))
         messages.removeAll { it.id == m.id }
         save()
     }
 
     fun clearThread(c: Contact) {
         messages.filter { it.contact == c.id && it.mine && it.state == 0 }.forEach { ChatSpool.cancelOutgoing(ctx, vault.slot, it.id) }
+        messages.filter { it.contact == c.id && it.kind == Msg.KIND_VOICE }.forEach { vault.deleteBlob(voiceBlob(it.id)) }
         messages.removeAll { it.contact == c.id }
+        save()
+    }
+
+    // ───────────────────────── Sprachnachrichten ─────────────────────────
+
+    private fun voiceBlob(id: String) = "cv_$id"
+
+    /** Sprachnachricht senden. Die Aufnahme liegt danach nur noch verschlüsselt im Tresor. */
+    fun sendVoice(c: Contact, audio: ByteArray, durMs: Long): Boolean {
+        val k = keys ?: return false
+        if (audio.isEmpty() || audio.size > MAX_VOICE_BYTES) return false
+        val id = newId()
+        val ts = System.currentTimeMillis()
+        val dur = durMs.coerceIn(0, MAX_VOICE_MS)
+        val plain = JSONObject().put("t", "voice").put("id", id).put("ts", ts).put("dur", dur)
+            .put("a", Crypto.b64(audio)).toString().toByteArray()
+        vault.writeBlob(voiceBlob(id), audio)
+        ChatSpool.putOutbox(ctx, vault.slot, id, c.onion, ChatCrypto.seal(k, c.pub, plain))
+        messages.add(Msg(id, c.id, true, "Sprachnachricht", ts, 0, Msg.KIND_VOICE, dur))
+        save()
+        ChatService.kick(ctx)
+        return true
+    }
+
+    fun voiceData(m: Msg): ByteArray? = vault.readBlob(voiceBlob(m.id))
+
+    // ───────────────────────── Anrufe ─────────────────────────
+
+    internal fun keysForCall(): ChatCrypto.KeyPair? = keys
+
+    /** Anruf im Verlauf vermerken (nur lokal, wird nicht verschickt). */
+    @Synchronized
+    fun logCall(contactId: String, mine: Boolean, text: String) {
+        if (contacts.none { it.id == contactId }) return
+        messages.add(Msg(newId(), contactId, mine, text, System.currentTimeMillis(), if (mine) 1 else 2, Msg.KIND_CALL))
         save()
     }
 

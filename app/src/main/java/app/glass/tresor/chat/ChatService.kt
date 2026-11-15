@@ -52,6 +52,10 @@ class ChatService : Service() {
         @Volatile
         var running = false
 
+        /** SOCKS-Port von Tor (für Anrufe), -1 = noch nicht bereit. */
+        @Volatile
+        var socksPort: Int = -1
+
         fun start(ctx: Context) {
             try {
                 ContextCompat.startForegroundService(ctx, Intent(ctx, ChatService::class.java))
@@ -139,6 +143,7 @@ class ChatService : Service() {
     override fun onDestroy() {
         running = false
         state = "Aus"
+        socksPort = -1
         wake()
         listeners.values.forEach { try { it.close() } catch (_: Exception) {} }
         listeners.clear()
@@ -190,7 +195,7 @@ class ChatService : Service() {
         startTor()
     }
 
-    private fun socksPort(): Int = try {
+    private fun torSocksPort(): Int = try {
         tor?.socksPort ?: -1
     } catch (e: Exception) {
         -1
@@ -219,21 +224,33 @@ class ChatService : Service() {
     }
 
     private fun receive(s: Socket, slot: String) {
+        var handedOver = false
         try {
-            s.use {
-                it.soTimeout = 120_000
-                val inp = DataInputStream(it.getInputStream())
+            s.soTimeout = 120_000
+            val inp = DataInputStream(s.getInputStream())
+            val first = inp.readInt()
+            if (first == CallProto.MAGIC) {
+                // Anruf: Verbindung bleibt offen und geht an die Anruf-Steuerung
                 val len = inp.readInt()
-                if (len <= 0 || len > MAX_FRAME) return
+                if (len <= 0 || len > CallProto.MAX_HANDSHAKE) return
                 val frame = ByteArray(len)
                 inp.readFully(frame)
-                ChatSpool.putInbox(this, slot, frame)
-                val out = it.getOutputStream()
-                out.write(1)
-                out.flush()
+                handedOver = true
+                Calls.onIncoming(this, slot, s, frame)
+                return
             }
+            val len = first
+            if (len <= 0 || len > MAX_FRAME) return
+            val frame = ByteArray(len)
+            inp.readFully(frame)
+            ChatSpool.putInbox(this, slot, frame)
+            val out = s.getOutputStream()
+            out.write(1)
+            out.flush()
             notifyNew()
         } catch (_: Exception) {
+        } finally {
+            if (!handedOver) try { s.close() } catch (_: Exception) {}
         }
     }
 
@@ -262,7 +279,8 @@ class ChatService : Service() {
 
     private fun runLoop() {
         while (running) {
-            val port = socksPort()
+            val port = torSocksPort()
+            socksPort = port
             if (port > 0) {
                 state = "Bereit"
                 ChatSpool.outbox(this).forEach { o ->

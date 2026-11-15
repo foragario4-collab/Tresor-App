@@ -38,7 +38,14 @@ Tarnung wechseln: Tresor → Einstellungen → Tarnung.
 ## Geschützte Ordner
 
 Ordner lange drücken → Schutz wählen: Tresor-PIN, eigenes Passwort oder Systemsperre (Fingerabdruck, die PIN funktioniert immer als Notfall).
-„Ordner ausblenden“ versteckt ihn komplett. Sichtbar wird er erst durch langes Drücken auf den Titel (Fotos / Videos / Dateien / Notizen).
+„Ordner verstecken“ macht ihn komplett unsichtbar. Hervorholen: lange auf den Titel drücken (Fotos / Videos / Dateien / Notizen) und den Code eingeben.
+
+- Ein Code öffnet genau die Ordner, die diesen Code als Passwort haben (z. B. 4711 → „Urlaub“ und „Privat“, 9999 → nur „Geheim“).
+- „Mit Fingerabdruck“ öffnet mit einem einzigen Abdruck alle Ordner mit Systemsperre.
+- Der Tresor-Code holt Ordner mit „Tresor-PIN“ und versteckte Ordner ohne extra Schutz hervor.
+- Ein falscher Code zeigt nur „Kein Ordner gefunden“, man sieht nicht, ob es weitere versteckte Ordner gibt.
+- Beim Verlassen der Übersicht verschwinden sie wieder. Nach mehreren Fehlversuchen wird die Eingabe kurz gebremst.
+- Werden die Fingerabdrücke im System geändert, gehen Systemsperre-Ordner weiter mit dem Tresor-Code.
 
 ## Mehrere geheime Tresore
 
@@ -52,6 +59,16 @@ Startseite → Chat → Anzeigename → „Chat einrichten“. Tor startet (beim
 Kontakt hinzufügen: QR-Code des anderen scannen oder seinen Text-Code einfügen. Der andere bekommt eine Anfrage und nimmt sie an.
 Nachrichten kommen an, sobald beide Handys online sind. Im Gespräch auf den Namen tippen → Sicherheitsnummer vergleichen.
 Damit es im Hintergrund zuverlässig läuft: Chat → Tipps → Akku-Optimierung ausschalten.
+
+**Sprachnachrichten:** Im Gespräch bei leerem Textfeld die Mikrofon-Taste tippen, sprechen, auf Senden tippen (bis 5 Minuten, Opus). Die Aufnahme liegt nur kurz im privaten App-Speicher und wird danach überschrieben und gelöscht. Danach existiert sie nur verschlüsselt im Tresor und wird direkt aus dem Speicher abgespielt.
+
+**Anrufe:** Im Gespräch oben auf das Telefon tippen. Die Verbindung läuft direkt von Handy zu Handy über Tor, ohne Server.
+- Für jeden Anruf entstehen neue Einmal-Schlüssel (X25519), nach dem Auflegen sind sie weg.
+- Das Gespräch ist mit AES-256-GCM verschlüsselt, ein Zähler schützt gegen Wiederholung.
+- Nur bestätigte Kontakte können anrufen.
+- Sprache: 8 kHz µ-law (Telefonqualität). Über Tor kommt sie etwa 0,5 bis 2 Sekunden verzögert an.
+- Ein Anruf klingelt auch bei gesperrtem Tresor (Mitteilung „Eingehender Anruf“, ohne Namen). Annehmen kannst du ihn nach dem Entsperren des richtigen Tresors, innerhalb von 45 Sekunden.
+- Wenn du die App verlässt oder mit der Seitentaste sperrst, endet das Gespräch. Am Ohr schaltet der Näherungssensor den Bildschirm ab, das Gespräch läuft dabei weiter.
 
 ## Privater Browser
 

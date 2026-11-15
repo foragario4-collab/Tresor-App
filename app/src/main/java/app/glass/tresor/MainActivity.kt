@@ -70,7 +70,8 @@ class MainActivity : FragmentActivity() {
 
     private val screenOff = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            App.lock()
+            // Während eines Gesprächs schaltet der Näherungssensor den Bildschirm am Ohr ab – dann nicht sperren
+            if (!app.glass.tresor.chat.Calls.busy) App.lock()
         }
     }
 
@@ -136,6 +137,17 @@ private fun Root() {
 
     MotionLock()
 
+    // Wartender Anruf: sobald der passende Tresor offen ist, Anrufer entschlüsseln und anzeigen
+    LaunchedEffect(app.glass.tresor.chat.Calls.pendingTick, App.vault) {
+        val v = App.vault ?: return@LaunchedEffect
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                app.glass.tresor.chat.Calls.resolveIncoming(app.glass.tresor.chat.ChatEngine.of(v))
+            } catch (_: Exception) {
+            }
+        }
+    }
+
     BackHandler(enabled = nav.stack.size > 1) {
         val top = nav.top
         if (top == Screen.Home) App.lock()
@@ -189,6 +201,7 @@ private fun Root() {
                 Screen.ChatTips -> app.glass.tresor.ui.screens.ChatTipsScreen()
             }
         }
+        app.glass.tresor.ui.screens.CallOverlay()
         Toast(Modifier.align(Alignment.BottomCenter))
     }
 }
@@ -242,7 +255,8 @@ private fun Toast(modifier: Modifier) {
 @Composable
 private fun MotionLock() {
     val ctx = LocalContext.current
-    val active = App.vault != null && App.motionLock
+    // Beim Telefonieren nicht – das Handy wird ja ans Ohr gehoben
+    val active = App.vault != null && App.motionLock && !app.glass.tresor.chat.Calls.busy
     DisposableEffect(active) {
         if (!active) return@DisposableEffect onDispose { }
         val sm = ctx.getSystemService(Context.SENSOR_SERVICE) as SensorManager

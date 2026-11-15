@@ -69,4 +69,13 @@ object Ic {
     val clock = stroke("clock", "M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0 -18z M12 7v5l3 2")
     val copy = stroke("copy", "M9 9h10a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1H9a1 1 0 0 1 -1 -1V10a1 1 0 0 1 1 -1z M5 15H4a1 1 0 0 1 -1 -1V4a1 1 0 0 1 1 -1h10a1 1 0 0 1 1 1v1")
     val person = stroke("person", "M12 4a4 4 0 1 0 0 8a4 4 0 1 0 0 -8z M4 20c0.8 -3.5 4 -6 8 -6s7.2 2.5 8 6")
+
+    // Sprachnachrichten und Anrufe
+    val phone = stroke("phone", "M5 4h3l1.5 4.5l-2 1.5a11 11 0 0 0 6.5 6.5l1.5 -2l4.5 1.5v3a2 2 0 0 1 -2 2A16 16 0 0 1 3 6a2 2 0 0 1 2 -2z")
+    val hangup = filled("hangup", "M12 9c-3.2 0 -6.2 0.9 -8.6 2.5c-0.9 0.6 -1.1 1.8 -0.5 2.7l1 1.4c0.5 0.7 1.4 0.9 2.2 0.6l2.4 -1c0.6 -0.3 1 -0.9 1 -1.6v-1.4c1.6 -0.4 3.4 -0.4 5 0v1.4c0 0.7 0.4 1.3 1 1.6l2.4 1c0.8 0.3 1.7 0.1 2.2 -0.6l1 -1.4c0.6 -0.9 0.4 -2.1 -0.5 -2.7C18.2 9.9 15.2 9 12 9z")
+    val mic = stroke("mic", "M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1 -6 0V6a3 3 0 0 1 3 -3z M5 11a7 7 0 0 0 14 0 M12 18v3")
+    val micOff = stroke("micOff", "M3 3l18 18 M15 10V6a3 3 0 0 0 -5.7 -1.3 M9 9v3a3 3 0 0 0 5 2.2 M5 11a7 7 0 0 0 11.2 5.6 M19 11a7 7 0 0 1 -0.6 2.8 M12 18v3")
+    val speaker = stroke("speaker", "M4 9h4l5 -4v14l-5 -4H4z M16.5 8.5a5 5 0 0 1 0 7 M19 6a8.5 8.5 0 0 1 0 12")
+    val pause = filled("pause", "M7 5h3.5v14H7z M13.5 5H17v14h-3.5z")
+    val stop = filled("stop", "M7 7h10v10H7z")
 }
