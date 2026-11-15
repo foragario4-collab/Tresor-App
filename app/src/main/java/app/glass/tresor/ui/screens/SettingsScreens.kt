@@ -228,9 +228,9 @@ fun SettingsScreen() {
             Spacer(Modifier.height(14.dp))
             Box(Modifier.fillMaxWidth().height(52.dp), contentAlignment = Alignment.Center) {
                 if (busy) CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(26.dp))
-                else PillButton("Speichern", primary = true, modifier = Modifier.fillMaxWidth(), enabled = p2.length >= 4 && p3.isNotEmpty()) {
+                else PillButton("Speichern", primary = true, modifier = Modifier.fillMaxWidth(), enabled = p2.length >= (if (panic) 4 else 6) && p3.isNotEmpty()) {
                     if (p2 != p3) { err = "Stimmt nicht überein."; return@PillButton }
-                    if (!p2.all { it.isDigit() } || p2.length > 12) { err = "4 bis 12 Ziffern."; return@PillButton }
+                    if (!p2.all { it.isDigit() } || p2.length > 12) { err = if (panic) "4 bis 12 Ziffern." else "6 bis 12 Ziffern."; return@PillButton }
                     busy = true
                     scope.launch {
                         val msg = withContext(Dispatchers.Default) {

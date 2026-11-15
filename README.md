@@ -8,13 +8,21 @@ Verschlüsselter Tresor für Fotos, Videos, Dateien und Notizen, getarnt als Rec
 2. GitHub baut automatisch: Reiter **Actions** → „APK bauen“.
 3. Nach ca. 5–8 Minuten unten bei **Artifacts** → `Tresor-APK` herunterladen, entpacken, APK installieren.
 
-Die APK ist immer mit demselben Schlüssel (`app/tresor-release.jks`) signiert. Neue Versionen lassen sich deshalb einfach drüber installieren.
+## Signierschlüssel (einmalig einrichten)
+
+Der Schlüssel, mit dem die APK signiert wird, liegt **nicht** im Repo, sondern als GitHub Secret.
+Repo → Settings → Secrets and variables → Actions → „New repository secret“:
+- `KEYSTORE_PASSWORD`
+- `KEYSTORE_BASE64`
+
+Die Werte stehen in der separaten Datei `GitHub-Secrets.txt` (nie ins Repo hochladen!).
+Weil jede Version mit demselben Schlüssel signiert ist, lassen sich Updates einfach drüber installieren.
 **Wichtig:** Die App nie deinstallieren, sonst ist der Tresor-Inhalt weg.
 
 ## Erster Start
 
-- Code festlegen (4–12 Ziffern).
-- Danach erscheint die App als **Rechner**.
+- Code festlegen (6–12 Ziffern).
+- Die App heißt „Tresor“ mit eigenem Logo. Tarnung bei Bedarf unter Einstellungen → Tarnung.
 
 ## Geheime Zugänge
 

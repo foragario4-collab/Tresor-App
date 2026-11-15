@@ -85,6 +85,8 @@ class MainActivity : FragmentActivity() {
         ContextCompat.registerReceiver(
             this, screenOff, IntentFilter(Intent.ACTION_SCREEN_OFF), ContextCompat.RECEIVER_NOT_EXPORTED
         )
+        // Schutz gegen unsichtbare Overlays über der Code-Eingabe (Android 12+ macht das selbst)
+        window.decorView.filterTouchesWhenObscured = android.os.Build.VERSION.SDK_INT < 31
         setContent { Root() }
     }
 

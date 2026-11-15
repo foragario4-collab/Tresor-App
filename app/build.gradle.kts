@@ -20,24 +20,26 @@ android {
         buildConfigField("String", "GITHUB_REPO", "\"$repo\"")
     }
 
-    // Fester Schlüssel, damit Updates ohne Deinstallation funktionieren
-    // (Deinstallieren würde den Tresor-Inhalt löschen).
+    // Signierschlüssel kommt aus GitHub Secrets (nie im Repo!).
+    // Fehlt er (z. B. lokaler Test-Build), wird mit dem Debug-Schlüssel signiert.
+    val ksFile = file("release.jks")
+    val ksPass = System.getenv("KEYSTORE_PASSWORD")
+    val hasReleaseKey = ksFile.exists() && !ksPass.isNullOrEmpty()
     signingConfigs {
-        create("tresor") {
-            storeFile = file("tresor-release.jks")
-            storePassword = "yXkRicX4fij4Dkjxerg5"
-            keyAlias = "tresor"
-            keyPassword = "yXkRicX4fij4Dkjxerg5"
+        if (hasReleaseKey) {
+            create("tresor") {
+                storeFile = ksFile
+                storePassword = ksPass
+                keyAlias = "tresor"
+                keyPassword = ksPass
+            }
         }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("tresor")
-        }
-        debug {
-            signingConfig = signingConfigs.getByName("tresor")
+            signingConfig = if (hasReleaseKey) signingConfigs.getByName("tresor") else signingConfigs.getByName("debug")
         }
     }
 

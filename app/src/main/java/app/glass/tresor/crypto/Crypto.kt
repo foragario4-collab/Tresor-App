@@ -107,7 +107,8 @@ object HwKeys {
                 b.setUserAuthenticationParameters(
                     0, KeyProperties.AUTH_BIOMETRIC_STRONG or KeyProperties.AUTH_DEVICE_CREDENTIAL
                 )
-                b.setInvalidatedByBiometricEnrollment(false)
+                // Neuer Fingerabdruck im System → Schlüssel wird ungültig (PIN geht weiterhin)
+                b.setInvalidatedByBiometricEnrollment(true)
             }
             if (strongBox) b.setIsStrongBoxBacked(true)
             val g = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, PROVIDER)

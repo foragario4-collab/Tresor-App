@@ -152,6 +152,10 @@ class Vault(val slot: String, val dir: File) {
     fun bioDecryptCipher(): Cipher? = try {
         val b = header().getJSONObject("bio")
         HwKeys.decryptCipher(bioAlias(), Crypto.unb64(b.getString("iv")))
+    } catch (e: android.security.keystore.KeyPermanentlyInvalidatedException) {
+        // Fingerabdrücke wurden geändert: Systemsperre abschalten, Code bleibt gültig
+        disableBio()
+        null
     } catch (e: Exception) {
         null
     }
@@ -333,7 +337,7 @@ class Vault(val slot: String, val dir: File) {
         val o = JSONObject(folder(id)!!.wrapSys!!)
         HwKeys.decryptCipher(folderAlias(id), Crypto.unb64(o.getString("iv")))
     } catch (e: Exception) {
-        null
+        null // z. B. Fingerabdrücke geändert → Ordner mit dem Tresor-Code öffnen
     }
 
     fun unlockFolderSys(id: String, c: Cipher): Boolean = try {
@@ -410,6 +414,8 @@ class Vault(val slot: String, val dir: File) {
     private fun thumbFile(fid: String, iid: String) = File(folderDir(fid), "$iid.th")
     private fun noteFile(fid: String, iid: String) = File(folderDir(fid), "$iid.note")
     private fun aadThumb(iid: String) = "thumb-$iid".toByteArray()
+    /** Bindet Dateiinhalte an ihre Element-ID: vertauschte Dateien fallen beim Entschlüsseln auf. */
+    private fun ctxOf(iid: String) = "data-$slot-$iid".toByteArray()
     private fun aadNote(iid: String) = "note-$iid".toByteArray()
 
     fun itemsOf(fid: String): List<Item> = items[fid] ?: emptyList()
@@ -425,7 +431,7 @@ class Vault(val slot: String, val dir: File) {
 
     fun importStream(fid: String, input: InputStream, meta: Item, thumb: ByteArray?): Item {
         val fk = fkeys[fid] ?: throw IllegalStateException("Ordner gesperrt")
-        val size = Chunked.encrypt(input, dataFile(fid, meta.id), fk)
+        val size = Chunked.encrypt(input, dataFile(fid, meta.id), fk, ctxOf(meta.id))
         var hasThumb = false
         if (thumb != null) {
             Crypto.writeAtomic(thumbFile(fid, meta.id), Crypto.seal(fk, thumb, aadThumb(meta.id)))
@@ -445,7 +451,7 @@ class Vault(val slot: String, val dir: File) {
 
     fun reader(fid: String, iid: String): EncryptedReader {
         val fk = fkeys[fid] ?: throw IllegalStateException("Ordner gesperrt")
-        return EncryptedReader(dataFile(fid, iid), fk)
+        return EncryptedReader(dataFile(fid, iid), fk, ctxOf(iid))
     }
 
     fun exportTo(fid: String, iid: String, out: OutputStream) {
@@ -481,8 +487,8 @@ class Vault(val slot: String, val dir: File) {
                 Crypto.writeAtomic(noteFile(to, id), Crypto.seal(fkTo, plain, aadNote(id)))
                 Crypto.wipe(plain)
             } else {
-                EncryptedReader(dataFile(from, id), fkFrom).use { r ->
-                    Chunked.encrypt(r.inputStream(), dataFile(to, id), fkTo)
+                EncryptedReader(dataFile(from, id), fkFrom, ctxOf(id)).use { r ->
+                    Chunked.encrypt(r.inputStream(), dataFile(to, id), fkTo, ctxOf(id))
                 }
                 if (it.hasThumb) {
                     readThumb(from, id)?.let { th ->

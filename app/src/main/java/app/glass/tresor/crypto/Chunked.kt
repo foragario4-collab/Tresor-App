@@ -18,12 +18,12 @@ import javax.crypto.spec.SecretKeySpec
  * Blocknummer und "letzter Block" sind authentifiziert – Vertauschen oder Abschneiden fällt auf.
  */
 object Chunked {
-    const val MAGIC = 0x54525631 // "TRV1"
+    const val MAGIC = 0x54525632 // "TRV2"
     const val CHUNK = 64 * 1024
     const val HEADER = 4 + 8 + 4
     private const val TAG = 16
 
-    fun encrypt(input: InputStream, out: File, key: ByteArray): Long {
+    fun encrypt(input: InputStream, out: File, key: ByteArray, ctx: ByteArray): Long {
         val prefix = Crypto.random(8)
         val header = ByteBuffer.allocate(HEADER).putInt(MAGIC).put(prefix).putInt(CHUNK).array()
         val ks = SecretKeySpec(key, "AES")
@@ -39,7 +39,7 @@ object Chunked {
             while (true) {
                 val m = if (n == CHUNK) readFully(input, next) else 0
                 val isFinal = n < CHUNK || m == 0
-                os.write(sealChunk(ks, prefix, header, idx, isFinal, buf, n))
+                os.write(sealChunk(ks, prefix, header, idx, isFinal, buf, n, ctx))
                 total += n
                 if (isFinal) break
                 val t = buf; buf = next; next = t
@@ -66,24 +66,25 @@ object Chunked {
     internal fun nonce(prefix: ByteArray, idx: Long): ByteArray =
         ByteBuffer.allocate(12).put(prefix).putInt(idx.toInt()).array()
 
-    internal fun aad(header: ByteArray, idx: Long, final: Boolean): ByteArray =
-        ByteBuffer.allocate(header.size + 9).put(header).putLong(idx).put(if (final) 1 else 0).array()
+    /** Authentifiziert: Header, Blocknummer, "letzter Block" und die Element-ID (ctx). */
+    internal fun aad(header: ByteArray, idx: Long, final: Boolean, ctx: ByteArray): ByteArray =
+        ByteBuffer.allocate(header.size + 9 + ctx.size).put(header).putLong(idx).put(if (final) 1 else 0).put(ctx).array()
 
     private fun sealChunk(
         ks: SecretKeySpec, prefix: ByteArray, header: ByteArray,
-        idx: Long, final: Boolean, buf: ByteArray, n: Int
+        idx: Long, final: Boolean, buf: ByteArray, n: Int, ctx: ByteArray
     ): ByteArray {
         val c = Cipher.getInstance("AES/GCM/NoPadding")
         c.init(Cipher.ENCRYPT_MODE, ks, GCMParameterSpec(TAG * 8, nonce(prefix, idx)))
-        c.updateAAD(aad(header, idx, final))
+        c.updateAAD(aad(header, idx, final, ctx))
         return c.doFinal(buf, 0, n)
     }
 
-    fun encryptBytes(bytes: ByteArray, out: File, key: ByteArray): Long =
-        encrypt(bytes.inputStream(), out, key)
+    fun encryptBytes(bytes: ByteArray, out: File, key: ByteArray, ctx: ByteArray): Long =
+        encrypt(bytes.inputStream(), out, key, ctx)
 }
 
-class EncryptedReader(file: File, key: ByteArray) : Closeable {
+class EncryptedReader(file: File, key: ByteArray, private val ctx: ByteArray) : Closeable {
     private val raf = RandomAccessFile(file, "r")
     private val ks = SecretKeySpec(key.copyOf(), "AES")
     private val header = ByteArray(Chunked.HEADER)
@@ -120,7 +121,7 @@ class EncryptedReader(file: File, key: ByteArray) : Closeable {
         raf.readFully(data)
         val c = Cipher.getInstance("AES/GCM/NoPadding")
         c.init(Cipher.DECRYPT_MODE, ks, GCMParameterSpec(128, Chunked.nonce(prefix, idx)))
-        c.updateAAD(Chunked.aad(header, idx, idx == numChunks - 1))
+        c.updateAAD(Chunked.aad(header, idx, idx == numChunks - 1, ctx))
         cache.fill(0)
         cache = c.doFinal(data)
         cacheIdx = idx

@@ -287,9 +287,10 @@ fun SetupScreen() {
                 }
                 1 -> PinPad(
                     title = "Code festlegen",
-                    subtitle = error ?: "4 bis 12 Ziffern. Diesen Code brauchst du für alles.",
+                    subtitle = error ?: "6 bis 12 Ziffern. Je länger, desto sicherer.",
                     pin = pin, onPin = { pin = it; error = null }, shakeKey = shake, busy = false,
                     confirmLabel = "Weiter",
+                    minLen = 6,
                     onConfirm = {
                         val weak = pin.toSet().size == 1 || "0123456789".contains(pin) || "9876543210".contains(pin)
                         if (weak) {
@@ -305,6 +306,7 @@ fun SetupScreen() {
                     subtitle = error ?: "Gib den Code noch einmal ein.",
                     pin = pin, onPin = { pin = it; error = null }, shakeKey = shake, busy = busy,
                     confirmLabel = "Tresor erstellen",
+                    minLen = 6,
                     onConfirm = {
                         if (pin != first) {
                             error = "Stimmt nicht überein."

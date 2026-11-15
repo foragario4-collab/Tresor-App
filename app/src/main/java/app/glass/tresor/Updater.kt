@@ -23,8 +23,22 @@ object Updater {
     val currentName: String get() = BuildConfig.VERSION_NAME
     val repo: String get() = BuildConfig.GITHUB_REPO
 
-    fun token(): String = App.prefs.getString("ghToken", "") ?: ""
-    fun setToken(t: String) = App.prefs.edit().putString("ghToken", t.trim()).apply()
+    /** Token liegt mit dem Hardware-Schlüssel verschlüsselt in den Einstellungen. */
+    fun token(): String = try {
+        val s = App.prefs.getString("ghTokenEnc", null) ?: return ""
+        String(app.glass.tresor.crypto.HwKeys.pepperOpen(app.glass.tresor.crypto.Crypto.unb64(s)))
+    } catch (e: Exception) {
+        ""
+    }
+
+    fun setToken(t: String) {
+        val v = t.trim()
+        if (v.isEmpty()) {
+            App.prefs.edit().remove("ghTokenEnc").apply(); return
+        }
+        val enc = app.glass.tresor.crypto.HwKeys.pepperSeal(v.toByteArray())
+        App.prefs.edit().putString("ghTokenEnc", app.glass.tresor.crypto.Crypto.b64(enc)).apply()
+    }
 
     private fun open(url: String, auth: Boolean, accept: String): HttpURLConnection {
         val c = URL(url).openConnection() as HttpURLConnection
