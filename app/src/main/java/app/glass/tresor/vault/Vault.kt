@@ -246,6 +246,32 @@ class Vault(val slot: String, val dir: File) {
         blobFile(name).delete()
     }
 
+    // ───── Verschlüsselte Datenblöcke innerhalb eines Ordners (mit dessen eigenem Schlüssel) ─────
+    // Für Chat-Konten: Ist das Konto geschützt, sind seine Daten ohne Konto-Code nicht lesbar.
+
+    private fun folderBlobFile(fid: String, name: String) = File(folderDir(fid), "blobs/$name.bin")
+    private fun folderBlobAad(fid: String, name: String) = "fblob-$slot-$fid-$name".toByteArray()
+
+    fun readFolderBlob(fid: String, name: String): ByteArray? {
+        val fk = fkeys[fid] ?: return null
+        val f = folderBlobFile(fid, name)
+        if (!f.exists()) return null
+        return try {
+            Crypto.open(fk, f.readBytes(), folderBlobAad(fid, name))
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    fun writeFolderBlob(fid: String, name: String, data: ByteArray) {
+        val fk = fkeys[fid] ?: throw IllegalStateException("Ordner gesperrt")
+        Crypto.writeAtomic(folderBlobFile(fid, name), Crypto.seal(fk, data, folderBlobAad(fid, name)))
+    }
+
+    fun deleteFolderBlob(fid: String, name: String) {
+        folderBlobFile(fid, name).delete()
+    }
+
     /** Ordner für Downloads finden oder anlegen. */
     @Synchronized
     fun ensureFolder(name: String, kind: FolderKind): Folder =
@@ -580,6 +606,12 @@ class Vault(val slot: String, val dir: File) {
     @Synchronized
     fun hideRevealed() {
         revealed.clear()
+    }
+
+    /** Nur bestimmte hervorgeholte Ordner wieder verstecken (z. B. nur Chat-Konten). */
+    @Synchronized
+    fun hideRevealed(which: (Folder) -> Boolean) {
+        revealed.removeAll { id -> folder(id)?.let(which) ?: true }
     }
 
     @Synchronized

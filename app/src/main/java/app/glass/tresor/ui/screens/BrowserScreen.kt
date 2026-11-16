@@ -74,6 +74,9 @@ import app.glass.tresor.ui.GlassIconButton
 import app.glass.tresor.ui.Haptic
 import app.glass.tresor.ui.Ic
 import app.glass.tresor.ui.Pill
+import app.glass.tresor.ui.SettingRow
+import app.glass.tresor.ui.GlassSwitch
+import androidx.compose.runtime.LaunchedEffect
 import app.glass.tresor.ui.Sheet
 import app.glass.tresor.ui.SheetHeader
 import app.glass.tresor.ui.glass
@@ -131,6 +134,17 @@ fun BrowserScreen() {
     var bookmarks by remember { mutableStateOf(BrowserData.bookmarks(vault)) }
     var showBookmarks by remember { mutableStateOf(false) }
     var downloads by remember { mutableIntStateOf(0) }
+    var blockedCount by remember { mutableIntStateOf(0) }
+    var adSheet by remember { mutableStateOf(false) }
+    var adOn by remember { mutableStateOf(App.prefs.getBoolean("adblock", true)) }
+    var adOffSites by remember { mutableStateOf(BrowserData.adOffSites(vault)) }
+    val pageHost = remember { java.util.concurrent.atomic.AtomicReference("") }
+    val adActive = remember { java.util.concurrent.atomic.AtomicBoolean(true) }
+    val blockCounter = remember { java.util.concurrent.atomic.AtomicInteger(0) }
+    LaunchedEffect(Unit) { withContext(Dispatchers.IO) { app.glass.tresor.browser.AdBlock.load(ctx) } }
+    // Zähler aus dem Hintergrund-Thread regelmäßig in die Anzeige übernehmen
+    LaunchedEffect(Unit) { while (true) { blockedCount = blockCounter.get(); kotlinx.coroutines.delay(500) } }
+    adActive.set(adOn && hostOf(currentUrl).removePrefix("www.") !in adOffSites)
     val fieldFocus = remember { FocusRequester() }
 
     BrowserData.used = true
@@ -164,8 +178,18 @@ fun BrowserScreen() {
                     return s != "http" && s != "https"
                 }
 
+                override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): android.webkit.WebResourceResponse? {
+                    if (!adActive.get() || !app.glass.tresor.browser.AdBlock.loaded) return null
+                    val r = app.glass.tresor.browser.AdBlock.intercept(request) ?: return null
+                    blockCounter.incrementAndGet()
+                    return r
+                }
+
                 override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
                     if (url == "about:blank") return
+                    blockCounter.set(0)
+                    pageHost.set(hostOf(url).removePrefix("www."))
+                    adActive.set(adOn && pageHost.get() !in adOffSites)
                     currentUrl = url; error = null
                     canBack = view.canGoBack(); canForward = view.canGoForward()
                 }
@@ -275,6 +299,19 @@ fun BrowserScreen() {
                     modifier = Modifier.weight(1f)
                 )
                 if (downloads > 0) Text("⬇ $downloads", style = G.footnote)
+                Spacer(Modifier.width(8.dp))
+                // Werbeblocker: Schild mit Anzahl blockierter Elemente
+                val active = adOn && hostOf(currentUrl).removePrefix("www.") !in adOffSites
+                Row(
+                    Modifier.pressable(Pill) { adSheet = true }.glass(Pill).padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Ic.shield, "Werbeblocker", tint = if (active) G.mint else G.faint, modifier = Modifier.size(16.dp))
+                    if (active && started) {
+                        Spacer(Modifier.width(5.dp))
+                        Text("$blockedCount", style = G.footnote.copy(color = Color.White))
+                    }
+                }
             }
 
             // Inhalt: Webseite oder Startseite
@@ -384,6 +421,32 @@ fun BrowserScreen() {
                 BarIcon(Ic.note, "Lesezeichen", true) { showBookmarks = true }
                 BarIcon(Ic.grid, "Startseite", started) { home() }
             }
+        }
+
+        Sheet(adSheet, { adSheet = false }) {
+            val host = hostOf(currentUrl).removePrefix("www.")
+            SheetHeader(
+                Ic.shield, "Werbeblocker",
+                if (!adOn) "Ausgeschaltet."
+                else if (started && host.isNotEmpty() && host !in adOffSites) "$blockedCount Werbe- und Tracker-Anfragen auf dieser Seite blockiert."
+                else "Blockiert Werbung und Tracker mit den Listen von uBlock und Brave (EasyList, EasyPrivacy)."
+            )
+            Column(Modifier.fillMaxWidth().glass(sq(20)).padding(horizontal = 14.dp, vertical = 2.dp)) {
+                SettingRow("Werbeblocker", "${app.glass.tresor.browser.AdBlock.count} bekannte Werbe- und Tracker-Adressen") {
+                    GlassSwitch(adOn, "Werbeblocker") { adOn = it; App.prefs.edit().putBoolean("adblock", it).apply() }
+                }
+                if (adOn && host.isNotEmpty()) {
+                    SettingRow("Für $host ausschalten", "Falls die Seite sonst nicht richtig funktioniert", showDivider = true) {
+                        GlassSwitch(host in adOffSites, "Für diese Seite aus") { off ->
+                            adOffSites = if (off) adOffSites + host else adOffSites - host
+                            BrowserData.saveAdOffSites(vault, adOffSites)
+                            web.reload()
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            Text("Die Liste mit den ausgenommenen Seiten liegt verschlüsselt in diesem Tresor.", style = G.footnote.copy(color = G.faint), textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.fillMaxWidth())
         }
 
         Sheet(showBookmarks, { showBookmarks = false }) {

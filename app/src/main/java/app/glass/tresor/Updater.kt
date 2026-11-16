@@ -17,7 +17,7 @@ import java.net.URL
  * einen GitHub-Token (nur Lesezugriff) eintragen.
  */
 object Updater {
-    data class Release(val build: Int, val name: String, val notes: String, val assetUrl: String, val size: Long)
+    data class Release(val build: Long, val name: String, val notes: String, val assetUrl: String, val size: Long)
 
     val currentBuild get() = BuildConfig.VERSION_CODE
     val currentName: String get() = BuildConfig.VERSION_NAME
@@ -66,7 +66,7 @@ object Updater {
                 else -> throw IllegalStateException("GitHub antwortet mit Fehler ${c.responseCode}.")
             }
             val o = JSONObject(c.inputStream.bufferedReader().readText())
-            val build = o.optString("tag_name").removePrefix("v").toIntOrNull() ?: return null
+            val build = o.optString("tag_name").removePrefix("v").toLongOrNull() ?: return null
             val assets = o.optJSONArray("assets") ?: return null
             for (i in 0 until assets.length()) {
                 val a = assets.getJSONObject(i)
@@ -119,6 +119,22 @@ object Updater {
             }
         }
         throw IllegalStateException("Zu viele Weiterleitungen.")
+    }
+
+    /** Laufnummer aus "1.<n>" bzw. "Tresor 1.<n>". */
+    private fun runNumber(s: String): Int? = Regex("""1\.(\d+)""").find(s)?.groupValues?.get(1)?.toIntOrNull()
+
+    /**
+     * Ist das Release neuer als die installierte App?
+     * Neue Workflow-Datei: Tag = Versionsnummer (Minuten seit 1970) → direkt vergleichen.
+     * Alte Workflow-Datei: Tag = kleine Build-Nummer → über die Laufnummer im Namen ("Tresor 1.12") vergleichen.
+     */
+    fun isNewer(r: Release): Boolean {
+        val oldStyleTag = r.build < 10_000_000L
+        if (!oldStyleTag) return r.build > currentBuild.toLong()
+        val remote = runNumber(r.name) ?: r.build.toInt()
+        val local = runNumber(currentName) ?: return false
+        return remote > local
     }
 
     fun canInstall(ctx: Context) = ctx.packageManager.canRequestPackageInstalls()

@@ -77,6 +77,7 @@ object Calls {
 
     fun call(e: ChatEngine, c: Contact) {
         val keys = e.keysForCall() ?: return
+        if (!e.callsAllowed(c)) { App.toast("Anrufe sind in diesem Chat ausgeschaltet"); return }
         val myGen: Int
         synchronized(lock) {
             if (phase != CallPhase.IDLE && phase != CallPhase.ENDED || pending != null) {
@@ -160,7 +161,8 @@ object Calls {
             pendingTick++
         }
         // Ist genau dieser Tresor gerade offen, klingelt der Anruf-Bildschirm selbst – sonst eine Mitteilung
-        if (App.vault?.slot != slot) notifyIncoming(c)
+        val open = App.vault?.slot
+        if (open == null || (slot != open && !slot.startsWith("$open-"))) notifyIncoming(c)
         val p = pending
         watcher = Thread({ watch(p, s) }, "call-watch").apply { start() }
         Thread({
@@ -215,10 +217,12 @@ object Calls {
     /** Nach dem Entsperren: Anruf entschlüsseln und anzeigen, wenn er an diesen Tresor geht. */
     fun resolveIncoming(e: ChatEngine) {
         val p = pending ?: return
-        if (p.slot != e.vault.slot) return
+        if (p.slot != e.spool) return
         val keys = e.keysForCall() ?: return
         val offer = try { CallProto.parseOffer(keys, p.frame) } catch (ex: Exception) { null }
+        // Nur bestätigte Kontakte, mit denen Anrufe vereinbart sind
         val contact = offer?.let { o -> e.contacts.firstOrNull { it.accepted && it.pub.contentEquals(o.senderPub) } }
+            ?.takeIf { e.callsAllowed(it) }
         val id = offer?.let { Crypto.b64(it.callId) }
         val fresh = offer != null && kotlin.math.abs(System.currentTimeMillis() - offer.ts) <= CallProto.OFFER_MAX_AGE_MS
         synchronized(lock) {

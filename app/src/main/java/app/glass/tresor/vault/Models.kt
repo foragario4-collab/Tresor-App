@@ -2,7 +2,8 @@ package app.glass.tresor.vault
 
 import org.json.JSONObject
 
-enum class FolderKind { MEDIA, FILES, NOTES }
+/** CHAT = ein weiteres Chat-Konto (eigene Identität, eigene Kontakte), geschützt wie ein Ordner. */
+enum class FolderKind { MEDIA, FILES, NOTES, CHAT }
 enum class Protection { NONE, PIN, PASSWORD, SYSTEM }
 enum class ItemType { IMAGE, VIDEO, FILE, NOTE }
 

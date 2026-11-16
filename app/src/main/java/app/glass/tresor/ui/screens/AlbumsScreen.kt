@@ -214,6 +214,7 @@ private fun FolderCard(vault: Vault, f: Folder, filter: ItemType?, onLong: () ->
                         FolderKind.MEDIA -> if (filter == ItemType.VIDEO) Ic.video else Ic.photo
                         FolderKind.FILES -> Ic.folder
                         FolderKind.NOTES -> Ic.note
+                        FolderKind.CHAT -> Ic.chat
                     },
                     Color.White.copy(alpha = 0.16f), size = 56.dp, radius = 16, iconSize = 26.dp
                 )
@@ -336,11 +337,12 @@ fun androidx.compose.foundation.layout.BoxScope.FolderUnlockSheet(
  * Der Fingerabdruck öffnet alle Ordner mit Systemsperre. Falsche Eingaben verraten nicht, ob es weitere gibt.
  */
 @Composable
-private fun androidx.compose.foundation.layout.BoxScope.FolderCodeSheet(
+fun androidx.compose.foundation.layout.BoxScope.FolderCodeSheet(
     vault: Vault,
     kind: FolderKind,
     visible: Boolean,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onOpened: (List<String>) -> Unit = {}
 ) {
     val activity = LocalContext.current as FragmentActivity
     val view = LocalView.current
@@ -361,7 +363,9 @@ private fun androidx.compose.foundation.layout.BoxScope.FolderCodeSheet(
         } else {
             wrong = 0
             onDismiss()
-            App.toast(if (opened.size == 1) "1 Ordner geöffnet" else "${opened.size} Ordner geöffnet")
+            val what = if (kind == FolderKind.CHAT) "Konto" to "Konten" else "Ordner" to "Ordner"
+            App.toast(if (opened.size == 1) "1 ${what.first} geöffnet" else "${opened.size} ${what.second} geöffnet")
+            onOpened(opened)
         }
     }
 

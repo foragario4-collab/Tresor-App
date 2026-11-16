@@ -21,9 +21,14 @@ object BrowserData {
     @Volatile
     var used = false
 
+    private fun read(v: Vault): JSONObject = try {
+        v.readBlob("browser")?.let { JSONObject(String(it)) } ?: JSONObject()
+    } catch (e: Exception) {
+        JSONObject()
+    }
+
     fun bookmarks(v: Vault): List<Bookmark> = try {
-        val b = v.readBlob("browser") ?: return emptyList()
-        val arr = JSONObject(String(b)).getJSONArray("bm")
+        val arr = read(v).optJSONArray("bm") ?: JSONArray()
         (0 until arr.length()).map { arr.getJSONObject(it).let { o -> Bookmark(o.getString("t"), o.getString("u")) } }
     } catch (e: Exception) {
         emptyList()
@@ -32,7 +37,21 @@ object BrowserData {
     fun saveBookmarks(v: Vault, list: List<Bookmark>) {
         val arr = JSONArray()
         list.forEach { arr.put(JSONObject().put("t", it.title).put("u", it.url)) }
-        v.writeBlob("browser", JSONObject().put("bm", arr).toString().toByteArray())
+        v.writeBlob("browser", read(v).put("bm", arr).toString().toByteArray())
+    }
+
+    /** Seiten, auf denen der Werbeblocker aus ist (verschlüsselt im Tresor, verrät sonst den Verlauf). */
+    fun adOffSites(v: Vault): Set<String> = try {
+        val arr = read(v).optJSONArray("noab") ?: JSONArray()
+        (0 until arr.length()).map { arr.getString(it) }.toSet()
+    } catch (e: Exception) {
+        emptySet()
+    }
+
+    fun saveAdOffSites(v: Vault, sites: Set<String>) {
+        val arr = JSONArray()
+        sites.forEach { arr.put(it) }
+        v.writeBlob("browser", read(v).put("noab", arr).toString().toByteArray())
     }
 
     /** Alles löschen, was der Browser hinterlassen hat. */

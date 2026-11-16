@@ -178,6 +178,34 @@ fun SettingsScreen() {
                     SettingRow("Sperre bei Bewegung", "Sperrt sofort bei ruckartiger Bewegung", showDivider = true) {
                         GlassSwitch(App.motionLock, "Bewegung") { App.setMotion(it) }
                     }
+                    if (App.motionLock) {
+                        Column(Modifier.padding(vertical = 10.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("Empfindlichkeit", style = G.body.copy(fontSize = 16.sp), modifier = Modifier.weight(1f))
+                                Text(
+                                    when {
+                                        App.motionSens < 0.25f -> "Nur starkes Rucken"
+                                        App.motionSens < 0.55f -> "Mittel"
+                                        App.motionSens < 0.8f -> "Empfindlich"
+                                        else -> "Sehr empfindlich"
+                                    },
+                                    style = G.footnote
+                                )
+                            }
+                            Spacer(Modifier.height(6.dp))
+                            app.glass.tresor.ui.GlassSlider(
+                                App.motionSens, { App.setMotionSens(it, persist = false) },
+                                onDone = { App.setMotionSens(App.motionSens, persist = true) }
+                            )
+                            Row {
+                                Text("Weniger", style = G.footnote.copy(color = G.faint), modifier = Modifier.weight(1f))
+                                Text("Mehr", style = G.footnote.copy(color = G.faint))
+                            }
+                        }
+                    }
+                    SettingRow("Sperre beim Umdrehen", "Display nach unten legen sperrt sofort", showDivider = true) {
+                        GlassSwitch(App.flipLock, "Umdrehen") { App.setFlipLock(it) }
+                    }
                     SettingRow("Originale nach Import löschen", "Android fragt nach, bevor Fotos aus der Galerie gelöscht werden", showDivider = true) {
                         GlassSwitch(delOrig, "Originale löschen") { delOrig = it; App.prefs.edit().putBoolean("deleteOriginals", it).apply() }
                     }
@@ -325,6 +353,8 @@ fun FolderSettingsScreen(fid: String) {
     }
 
     fun close() { target = null; s1 = ""; s2 = ""; err = null }
+    val isChat = f.kind == app.glass.tresor.vault.FolderKind.CHAT
+    val what = if (isChat) "Konto" else "Ordner"
 
     fun apply(p: Protection, secret: String?, sys: javax.crypto.Cipher?) {
         busy = true
@@ -346,7 +376,7 @@ fun FolderSettingsScreen(fid: String) {
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text("Schutz für „${f.name}“", style = G.largeTitle.copy(fontSize = 30.sp))
-                Text("Wie dieser Ordner geöffnet wird.", style = G.callout.copy(color = G.dim))
+                Text(if (isChat) "Wie dieses Chat-Konto geöffnet wird." else "Wie dieser Ordner geöffnet wird.", style = G.callout.copy(color = G.dim))
                 Spacer(Modifier.height(4.dp))
                 GlassGroup {
                     ProtRow(Ic.folder, "Kein extra Schutz", "Offen, sobald der Tresor offen ist", f.protection == Protection.NONE) {
@@ -359,7 +389,7 @@ fun FolderSettingsScreen(fid: String) {
                     }
                 }
                 GlassGroup {
-                    SettingRow("Ordner verstecken", "Unsichtbar. Erscheint nur mit seinem Code oder Fingerabdruck") {
+                    SettingRow("$what verstecken", if (isChat) "Unsichtbar. Im Chat lange auf „Chat“ drücken und Code eingeben" else "Unsichtbar. Erscheint nur mit seinem Code oder Fingerabdruck") {
                         GlassSwitch(f.hidden, "Ausblenden") { vault.setHidden(fid, it) }
                     }
                     if (f.isProtected) {
@@ -374,7 +404,7 @@ fun FolderSettingsScreen(fid: String) {
                 )
                 Spacer(Modifier.height(6.dp))
                 PillButton("Umbenennen", modifier = Modifier.fillMaxWidth()) { newName = f.name; rename = true }
-                PillButton("Ordner löschen", textColor = G.red, modifier = Modifier.fillMaxWidth()) { confirmDelete = true }
+                PillButton("$what löschen", textColor = G.red, modifier = Modifier.fillMaxWidth()) { confirmDelete = true }
             }
         }
 
@@ -418,14 +448,18 @@ fun FolderSettingsScreen(fid: String) {
 
         ConfirmSheet(
             visible = confirmDelete,
-            title = "Ordner löschen?",
-            text = "Der Ordner und sein gesamter Inhalt werden endgültig gelöscht.",
+            title = "$what löschen?",
+            text = if (isChat) "Alle Kontakte und Nachrichten dieses Kontos werden endgültig gelöscht." else "Der Ordner und sein gesamter Inhalt werden endgültig gelöscht.",
             confirm = "Löschen",
             onDismiss = { confirmDelete = false }
         ) {
             confirmDelete = false
             App.nav.pop()
             if (App.nav.top is app.glass.tresor.Screen.FolderView) App.nav.pop()
+            if (isChat) {
+                app.glass.tresor.chat.ChatEngine.forgetAccount(vault, fid)
+                app.glass.tresor.chat.ChatAccounts.reset()
+            }
             scope.launch { withContext(Dispatchers.IO) { vault.deleteFolder(fid) } }
         }
     }
@@ -470,7 +504,7 @@ private fun UpdateSection() {
             val r = withContext(Dispatchers.IO) { runCatching { up.latest() } }
             checking = false
             r.onSuccess { rel ->
-                if (rel != null && rel.build > up.currentBuild) release = rel
+                if (rel != null && up.isNewer(rel)) release = rel
                 else status = "Du hast die neueste Version."
             }.onFailure { status = it.message ?: "Keine Verbindung." }
         }

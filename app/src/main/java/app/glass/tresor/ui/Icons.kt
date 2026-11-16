@@ -78,4 +78,5 @@ object Ic {
     val speaker = stroke("speaker", "M4 9h4l5 -4v14l-5 -4H4z M16.5 8.5a5 5 0 0 1 0 7 M19 6a8.5 8.5 0 0 1 0 12")
     val pause = filled("pause", "M7 5h3.5v14H7z M13.5 5H17v14h-3.5z")
     val stop = filled("stop", "M7 7h10v10H7z")
+    val chevronDown = stroke("chevronDown", "M6 9l6 6l6 -6")
 }

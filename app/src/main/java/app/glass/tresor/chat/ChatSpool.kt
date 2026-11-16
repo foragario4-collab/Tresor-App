@@ -126,4 +126,46 @@ object ChatSpool {
     }
 
     fun hasPendingOutbox(ctx: Context) = outbox(ctx).isNotEmpty()
+
+    // ───── Entfernte Kontakte (für den Dienst lesbar, mit Hardware-Schlüssel verschlüsselt) ─────
+
+    private val blockedCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, Set<String>>>()
+
+    fun setBlocked(ctx: Context, slot: String, pubs: Set<String>) {
+        try {
+            val f = File(dir(ctx, slot, "cfg"), "blocked.bin")
+            if (pubs.isEmpty()) { f.delete(); blockedCache.remove(slot); return }
+            val arr = JSONArray(); pubs.forEach { arr.put(it) }
+            Crypto.writeAtomic(f, seal(arr.toString().toByteArray()))
+            blockedCache.remove(slot)
+        } catch (_: Exception) {
+        }
+    }
+
+    fun blocked(ctx: Context, slot: String): Set<String> {
+        val f = File(File(slotDir(ctx, slot), "cfg"), "blocked.bin")
+        if (!f.exists()) return emptySet()
+        val m = f.lastModified()
+        blockedCache[slot]?.let { if (it.first == m) return it.second }
+        return try {
+            val arr = JSONArray(String(open(f.readBytes())))
+            val set = (0 until arr.length()).map { arr.getString(it) }.toSet()
+            blockedCache[slot] = m to set
+            set
+        } catch (e: Exception) {
+            emptySet()
+        }
+    }
+
+    /** Absender eines Pakets (öffentlicher Schlüssel steht unverschlüsselt im Kopf, der Inhalt nicht). */
+    fun senderOf(frame: ByteArray): String? = try {
+        JSONObject(String(frame)).optString("f").ifEmpty { null }
+    } catch (e: Exception) {
+        null
+    }
+
+    fun isBlocked(ctx: Context, slot: String, frame: ByteArray): Boolean {
+        val s = senderOf(frame) ?: return false
+        return s in blocked(ctx, slot)
+    }
 }

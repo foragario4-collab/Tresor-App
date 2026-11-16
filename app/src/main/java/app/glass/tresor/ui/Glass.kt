@@ -1,5 +1,11 @@
 package app.glass.tresor.ui
 
+import androidx.compose.ui.draw.shadow
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.runtime.setValue
 import android.view.HapticFeedbackConstants
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
@@ -493,4 +499,47 @@ fun formatDuration(ms: Long): String {
     val m = (s % 3600) / 60
     val sec = s % 60
     return if (h > 0) "%d:%02d:%02d".format(h, m, sec) else "%d:%02d".format(m, sec)
+}
+
+
+/** Schieberegler im Apple-Stil (Wert 0..1). */
+@Composable
+fun GlassSlider(value: Float, onChange: (Float) -> Unit, modifier: Modifier = Modifier, onDone: () -> Unit = {}) {
+    val change by androidx.compose.runtime.rememberUpdatedState(onChange)
+    val done by androidx.compose.runtime.rememberUpdatedState(onDone)
+    var w by remember { androidx.compose.runtime.mutableFloatStateOf(1f) }
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val knob = 28.dp
+    val knobPx = with(density) { knob.toPx() }
+    val v = value.coerceIn(0f, 1f)
+    fun set(x: Float) {
+        val span = (w - knobPx).coerceAtLeast(1f)
+        change(((x - knobPx / 2) / span).coerceIn(0f, 1f))
+    }
+    Box(
+        modifier
+            .fillMaxWidth()
+            .height(34.dp)
+            .onSizeChanged { w = it.width.toFloat() }
+            .pointerInput(Unit) { detectTapGestures { set(it.x); done() } }
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures(onDragEnd = { done() }) { c, _ -> c.consume(); set(c.position.x) }
+            },
+        contentAlignment = Alignment.CenterStart
+    ) {
+        Box(Modifier.fillMaxWidth().padding(horizontal = knob / 2).height(4.dp).clip(Pill).background(Color.White.copy(alpha = 0.2f)))
+        Box(
+            Modifier.padding(start = knob / 2)
+                .width(with(density) { ((w - knobPx).coerceAtLeast(0f) * v).toDp() })
+                .height(4.dp).clip(Pill).background(G.accent)
+        )
+        Box(
+            Modifier
+                .offset { androidx.compose.ui.unit.IntOffset(((w - knobPx).coerceAtLeast(0f) * v).toInt(), 0) }
+                .size(knob)
+                .shadow(4.dp, CircleShape)
+                .clip(CircleShape)
+                .background(Color.White)
+        )
+    }
 }

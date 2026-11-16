@@ -211,6 +211,7 @@ fun FolderScreen(fid: String, filter: ItemType?) {
                     }
                     FolderKind.FILES -> BarButton(Ic.plus, "Datei hinzufügen") { import.pickFiles() }
                     FolderKind.NOTES -> BarButton(Ic.edit, "Neue Notiz") { App.nav.push(Screen.NoteEdit(fid, null)) }
+                    FolderKind.CHAT -> {}
                 }
             }
         }

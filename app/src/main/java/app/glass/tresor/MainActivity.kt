@@ -136,13 +136,16 @@ private fun Root() {
     }
 
     MotionLock()
+    FlipLock()
 
     // Wartender Anruf: sobald der passende Tresor offen ist, Anrufer entschlüsseln und anzeigen
-    LaunchedEffect(app.glass.tresor.chat.Calls.pendingTick, App.vault) {
+    LaunchedEffect(app.glass.tresor.chat.Calls.pendingTick, App.vault, App.vault?.unlockedFolders?.size, App.vault?.revealed?.size) {
         val v = App.vault ?: return@LaunchedEffect
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             try {
-                app.glass.tresor.chat.Calls.resolveIncoming(app.glass.tresor.chat.ChatEngine.of(v))
+                // Jedes sichtbare offene Chat-Konto prüfen – der Anruf gehört zu genau einem
+                app.glass.tresor.chat.ChatEngine.openEngines(v, visibleOnly = true)
+                    .forEach { app.glass.tresor.chat.Calls.resolveIncoming(it) }
             } catch (_: Exception) {
             }
         }
@@ -199,8 +202,10 @@ private fun Root() {
                 is Screen.ChatThread -> app.glass.tresor.ui.screens.ChatThreadScreen(s.contactId)
                 Screen.ChatCode -> app.glass.tresor.ui.screens.ChatCodeScreen()
                 Screen.ChatTips -> app.glass.tresor.ui.screens.ChatTipsScreen()
+                Screen.ChatAdd -> app.glass.tresor.ui.screens.ChatAddScreen()
             }
         }
+        app.glass.tresor.ui.screens.ChatBanner(Modifier.align(Alignment.TopCenter))
         app.glass.tresor.ui.screens.CallOverlay()
         Toast(Modifier.align(Alignment.BottomCenter))
     }
@@ -251,6 +256,36 @@ private fun Toast(modifier: Modifier) {
     }
 }
 
+/** Sperre beim Umdrehen: liegt das Handy mit dem Display nach unten, wird sofort gesperrt. */
+@Composable
+private fun FlipLock() {
+    val ctx = LocalContext.current
+    val active = App.vault != null && App.flipLock && !app.glass.tresor.chat.Calls.busy
+    DisposableEffect(active) {
+        if (!active) return@DisposableEffect onDispose { }
+        val sm = ctx.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        val sensor = sm.getDefaultSensor(Sensor.TYPE_GRAVITY) ?: sm.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+        val g = FloatArray(3)
+        var downSince = 0L
+        val startAt = System.currentTimeMillis() + 600
+        val listener = object : SensorEventListener {
+            override fun onSensorChanged(e: SensorEvent) {
+                for (i in 0..2) g[i] = 0.8f * g[i] + 0.2f * e.values[i]
+                if (System.currentTimeMillis() < startAt) return
+                // z stark negativ = Display zeigt nach unten
+                if (g[2] < -8.0f && kotlin.math.abs(g[0]) < 3f && kotlin.math.abs(g[1]) < 3f) {
+                    if (downSince == 0L) downSince = System.currentTimeMillis()
+                    else if (System.currentTimeMillis() - downSince > 350) App.lock()
+                } else downSince = 0L
+            }
+
+            override fun onAccuracyChanged(s: Sensor?, a: Int) {}
+        }
+        if (sensor != null) sm.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_UI)
+        onDispose { sm.unregisterListener(listener) }
+    }
+}
+
 /** Sperre bei Bewegung: ruckartige Bewegung (z. B. Handy wird weggenommen) → sofort sperren. */
 @Composable
 private fun MotionLock() {
@@ -277,7 +312,7 @@ private fun MotionLock() {
                     for (i in 0..2) gravity[i] = 0.9f * gravity[i] + 0.1f * e.values[i]
                     x = e.values[0] - gravity[0]; y = e.values[1] - gravity[1]; z = e.values[2] - gravity[2]
                 }
-                if (sqrt(x * x + y * y + z * z) > 4.5f) App.lock()
+                if (sqrt(x * x + y * y + z * z) > App.motionThreshold()) App.lock()
             }
 
             override fun onAccuracyChanged(s: Sensor?, a: Int) {}

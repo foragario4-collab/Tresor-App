@@ -46,6 +46,7 @@ sealed interface Screen {
     data class ChatThread(val contactId: String) : Screen
     data object ChatCode : Screen
     data object ChatTips : Screen
+    data object ChatAdd : Screen
     data class FolderSettings(val fid: String) : Screen
 }
 
@@ -146,6 +147,10 @@ object App {
 
     var secure by mutableStateOf(true)
     var motionLock by mutableStateOf(false)
+    /** Empfindlichkeit der Bewegungssperre 0 (nur starkes Rucken) … 1 (sehr empfindlich). */
+    var motionSens by mutableStateOf(0.4f)
+    /** Sperren, sobald das Handy mit dem Display nach unten liegt. */
+    var flipLock by mutableStateOf(false)
     var wipeAfter10 by mutableStateOf(false)
 
     fun init(c: Context) {
@@ -157,6 +162,8 @@ object App {
         loadVaults()
         secure = prefs.getBoolean("secure", true)
         motionLock = prefs.getBoolean("motion", false)
+        motionSens = prefs.getFloat("motionSens", 0.4f).coerceIn(0f, 1f)
+        flipLock = prefs.getBoolean("flipLock", false)
         wipeAfter10 = prefs.getBoolean("wipe10", false)
         disguise = Disguise.entries.firstOrNull { it.name == prefs.getString("disguiseName", null) } ?: Disguise.TRESOR
         clearShareCache(force = true)
@@ -167,6 +174,10 @@ object App {
 
     fun changeSecure(v: Boolean) { secure = v; prefs.edit().putBoolean("secure", v).apply() }
     fun setMotion(v: Boolean) { motionLock = v; prefs.edit().putBoolean("motion", v).apply() }
+    fun setMotionSens(v: Float, persist: Boolean) { motionSens = v.coerceIn(0f, 1f); if (persist) prefs.edit().putFloat("motionSens", motionSens).apply() }
+    fun setFlipLock(v: Boolean) { flipLock = v; prefs.edit().putBoolean("flipLock", v).apply() }
+    /** Schwelle in m/s²: weniger empfindlich = höhere Schwelle. */
+    fun motionThreshold() = 12f - motionSens * 9.5f
     fun setWipe(v: Boolean) { wipeAfter10 = v; prefs.edit().putBoolean("wipe10", v).apply() }
 
     fun lockoutRemainingMs(): Long =
@@ -241,13 +252,23 @@ object App {
             }
         }.toSet()
         // Per Code / Fingerabdruck hervorgeholte Ordner bleiben offen, solange man in der Ordner-Übersicht ist.
-        // Verlässt man sie, verschwinden ausgeblendete Ordner wieder.
+        // Verlässt man sie, verschwinden ausgeblendete Ordner wieder. Für Chat-Konten gilt dasselbe mit dem Chat.
         val inAlbums = nav.stack.any { it is Screen.Albums }
-        if (!inAlbums) v.hideRevealed()
-        val keep = if (inAlbums) v.revealed.toSet() else emptySet()
+        val inChat = nav.stack.any {
+            it == Screen.Chat || it is Screen.ChatThread || it == Screen.ChatCode || it == Screen.ChatAdd || it == Screen.ChatTips
+        }
+        val isChat = { f: app.glass.tresor.vault.Folder -> f.kind == app.glass.tresor.vault.FolderKind.CHAT }
+        if (!inAlbums) v.hideRevealed { !isChat(it) }
+        if (!inChat) {
+            v.hideRevealed { isChat(it) }
+            app.glass.tresor.chat.ChatAccounts.reset()
+        }
+        val keep = v.revealed.toMutableSet()
+        if (inChat) keep += app.glass.tresor.chat.ChatAccounts.selected
         v.folders.toList()
             .filter { it.isProtected && it.relock && it.id !in used && it.id !in keep && v.isFolderUnlocked(it.id) }
             .forEach { v.relockFolder(it.id) }
+        app.glass.tresor.chat.ChatEngine.prune(v)
     }
 
     fun onBioUnlocked(v: Vault) {
@@ -271,6 +292,7 @@ object App {
         if (vault == null && nav.top == Screen.Disguise) return
         beforeLock.toList().forEach { it() }
         app.glass.tresor.chat.Calls.onVaultLocked()
+        app.glass.tresor.chat.ChatAccounts.reset()
         app.glass.tresor.chat.VoicePlayer.stop()
         app.glass.tresor.chat.ChatEngine.close()
         vaults.forEach { it.lock() }

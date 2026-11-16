@@ -60,6 +60,16 @@ Kontakt hinzufügen: QR-Code des anderen scannen oder seinen Text-Code einfügen
 Nachrichten kommen an, sobald beide Handys online sind. Im Gespräch auf den Namen tippen → Sicherheitsnummer vergleichen.
 Damit es im Hintergrund zuverlässig läuft: Chat → Tipps → Akku-Optimierung ausschalten.
 
+**Mehrere Chat-Konten:** Im Chat oben auf das Konto tippen → „Neues Konto“ (z. B. „Arbeit“). Jedes Konto hat eigenen Namen, eigene Tor-Adresse, eigene Kontakte und einen eigenen QR-Code. Über „Schutz & Verstecken“ lässt sich ein Konto wie ein Galerie-Ordner mit Passwort, Tresor-PIN oder Systemsperre schützen und verstecken. Versteckte Konten holst du hervor, indem du lange auf „Chat“ drückst und den Code eingibst. Die Daten geschützter Konten sind mit dem eigenen Konto-Schlüssel verschlüsselt. Nachrichten an ein gesperrtes Konto werden gesammelt und erscheinen nach dem Öffnen.
+
+**Kontakt hinzufügen:** ein Bildschirm, immer hochkant. Oben die Kamera, darunter dein eigener QR-Code, so könnt ihr euch gleichzeitig scannen.
+
+**Gemeinsame Chat-Einstellungen** (im Gespräch auf den Namen tippen → Chat-Einstellungen): Löschen für beide, selbstlöschende Nachrichten (1 Std. / 1 Tag / 1 Woche), Anrufe, Sprachnachrichten. Sie gelten immer für beide. Nach „Kontakt benachrichtigen“ bekommt der andere ein Fenster mit Annehmen/Ablehnen, bis dahin ruht der Chat.
+
+**Kontakt entfernen:** Der andere bekommt den Hinweis „… hat dich als Kontakt entfernt“. Ist „Löschen für beide“ vereinbart, wird der Chat auch bei ihm gelöscht. Pakete und Anrufe entfernter Kontakte werden schon im Hintergrund verworfen, das Handy vibriert also nicht mehr.
+
+**Banner:** Kommt eine Nachricht, während der Tresor offen ist, erscheint oben ein Banner. Tippen öffnet den Chat.
+
 **Sprachnachrichten:** Im Gespräch bei leerem Textfeld die Mikrofon-Taste tippen, sprechen, auf Senden tippen (bis 5 Minuten, Opus). Die Aufnahme liegt nur kurz im privaten App-Speicher und wird danach überschrieben und gelöscht. Danach existiert sie nur verschlüsselt im Tresor und wird direkt aus dem Speicher abgespielt.
 
 **Anrufe:** Im Gespräch oben auf das Telefon tippen. Die Verbindung läuft direkt von Handy zu Handy über Tor, ohne Server.
@@ -74,6 +84,7 @@ Damit es im Hintergrund zuverlässig läuft: Chat → Tipps → Akku-Optimierung
 
 Startseite → Browser. Kein Verlauf, Cookies und Website-Daten werden beim Sperren gelöscht.
 Lesezeichen sind verschlüsselt, Downloads landen verschlüsselt unter Dateien → Downloads.
+Werbeblocker: blockiert Werbung und Tracker mit EasyList und EasyPrivacy (dieselben Listen wie uBlock und Brave). GitHub lädt sie bei jedem Build frisch herunter. Das Schild oben zeigt, wie viel blockiert wurde. Dort kannst du den Blocker pro Seite oder ganz ausschalten.
 
 ## Notfall-Löschcode
 
@@ -96,7 +107,7 @@ In der App: Einstellungen → Updates → „Prüfen“ → „Installieren“.
 - Schlüssel aus dem Code: PBKDF2-HMAC-SHA512, 210.000 Runden, plus Hardware-Schicht im Android Keystore (StrongBox, falls vorhanden)
 - Jeder geschützte Ordner hat einen eigenen Schlüssel
 - Videos werden blockweise direkt aus der verschlüsselten Datei abgespielt
-- Sperre beim Verlassen der App und bei Displaysperre, optional bei Bewegung
+- Sperre beim Verlassen der App und bei Displaysperre, optional bei Bewegung (Empfindlichkeit per Regler) und beim Umdrehen (Display nach unten)
 - Screenshot-Sperre, Tarn-PIN mit Schein-Tresor, optional Löschen nach 10 Fehlversuchen
 - Kein Backup, keine Cloud, keine Tracker. Nur die News-Tarnung nutzt das Internet (RSS).
 

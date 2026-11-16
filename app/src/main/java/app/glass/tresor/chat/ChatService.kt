@@ -235,6 +235,11 @@ class ChatService : Service() {
                 if (len <= 0 || len > CallProto.MAX_HANDSHAKE) return
                 val frame = ByteArray(len)
                 inp.readFully(frame)
+                if (ChatSpool.isBlocked(this, slot, frame)) {
+                    // Entfernter Kontakt ruft an → still abweisen, kein Klingeln
+                    java.io.DataOutputStream(s.getOutputStream()).apply { writeInt(CallProto.DECLINE); flush() }
+                    return
+                }
                 handedOver = true
                 Calls.onIncoming(this, slot, s, frame)
                 return
@@ -243,19 +248,24 @@ class ChatService : Service() {
             if (len <= 0 || len > MAX_FRAME) return
             val frame = ByteArray(len)
             inp.readFully(frame)
-            ChatSpool.putInbox(this, slot, frame)
+            val blocked = ChatSpool.isBlocked(this, slot, frame)
+            // Bestätigen, damit der Absender nicht ewig neu sendet – Pakete entfernter Kontakte werden verworfen
+            if (!blocked) ChatSpool.putInbox(this, slot, frame)
             val out = s.getOutputStream()
             out.write(1)
             out.flush()
-            notifyNew()
+            if (!blocked) notifyNew(slot)
         } catch (_: Exception) {
         } finally {
             if (!handedOver) try { s.close() } catch (_: Exception) {}
         }
     }
 
-    private fun notifyNew() {
+    private fun notifyNew(slot: String) {
         if (!app.glass.tresor.App.prefs.getBoolean("chatNotify", true)) return
+        // Ist genau dieser Tresor offen, zeigt die App selbst ein Banner – keine zusätzliche Mitteilung
+        val open = app.glass.tresor.App.vault?.slot
+        if (open != null && (slot == open || slot.startsWith("$open-"))) return
         try {
             val launch = packageManager.getLaunchIntentForPackage(packageName)
             val pi = launch?.let {
