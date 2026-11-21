@@ -175,7 +175,7 @@ object App {
     fun changeSecure(v: Boolean) { secure = v; prefs.edit().putBoolean("secure", v).apply() }
     fun setMotion(v: Boolean) { motionLock = v; prefs.edit().putBoolean("motion", v).apply() }
     fun setMotionSens(v: Float, persist: Boolean) { motionSens = v.coerceIn(0f, 1f); if (persist) prefs.edit().putFloat("motionSens", motionSens).apply() }
-    fun setFlipLock(v: Boolean) { flipLock = v; prefs.edit().putBoolean("flipLock", v).apply() }
+    fun changeFlipLock(v: Boolean) { flipLock = v; prefs.edit().putBoolean("flipLock", v).apply() }
     /** Schwelle in m/s²: weniger empfindlich = höhere Schwelle. */
     fun motionThreshold() = 12f - motionSens * 9.5f
     fun setWipe(v: Boolean) { wipeAfter10 = v; prefs.edit().putBoolean("wipe10", v).apply() }

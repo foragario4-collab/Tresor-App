@@ -204,7 +204,7 @@ fun SettingsScreen() {
                         }
                     }
                     SettingRow("Sperre beim Umdrehen", "Display nach unten legen sperrt sofort", showDivider = true) {
-                        GlassSwitch(App.flipLock, "Umdrehen") { App.setFlipLock(it) }
+                        GlassSwitch(App.flipLock, "Umdrehen") { App.changeFlipLock(it) }
                     }
                     SettingRow("Originale nach Import löschen", "Android fragt nach, bevor Fotos aus der Galerie gelöscht werden", showDivider = true) {
                         GlassSwitch(delOrig, "Originale löschen") { delOrig = it; App.prefs.edit().putBoolean("deleteOriginals", it).apply() }
