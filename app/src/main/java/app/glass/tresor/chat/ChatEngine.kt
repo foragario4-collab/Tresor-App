@@ -278,6 +278,8 @@ class ChatEngine private constructor(val vault: Vault, val account: String) {
         writeData("chat", o.toString().toByteArray())
         // Für den Hintergrund-Dienst: wessen Pakete sofort verworfen werden (ohne Vibration)
         ChatSpool.setBlocked(ctx, spool, blocked.toSet())
+        // Für „Ich bin wieder da“: wem der Dienst Bescheid gibt, sobald er online ist
+        ChatSpool.setPeers(ctx, spool, contacts.filter { it.accepted && !it.removedByPeer }.map { it.onion }.toSet())
     }
 
     /** Chat einrichten: Schlüssel erzeugen, Tor-Adresse anmelden. */

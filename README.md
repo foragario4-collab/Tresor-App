@@ -71,7 +71,7 @@ Nur ein Tresor kann per Fingerabdruck öffnen (der, in dem die Systemsperre zule
 
 Startseite → Chat → Anzeigename → „Chat einrichten“. Tor startet (beim ersten Mal 30–60 Sekunden).
 Kontakt hinzufügen: QR-Code des anderen scannen oder seinen Text-Code einfügen. Der andere bekommt eine Anfrage und nimmt sie an.
-Nachrichten kommen an, sobald beide Handys online sind. Im Gespräch auf den Namen tippen → Sicherheitsnummer vergleichen.
+Nachrichten kommen automatisch an, ganz ohne Server: Ist der andere offline, wartet die Nachricht verschlüsselt auf deinem Handy (Uhr-Symbol). Kommt er wieder online, gibt sein Handy allen Kontakten kurz Bescheid („Ich bin wieder da“, ohne Inhalt) und deins schickt sofort nach. Zusätzlich wird es pro Kontakt immer wieder versucht (nach 10 s, 20 s, 40 s … höchstens alle 5 Minuten) und sofort, wenn das Internet wieder da ist (z. B. Wechsel WLAN ↔ Mobilfunk). Ein Kontakt, der offline ist, hält die Zustellung an andere nicht auf. Im Gespräch auf den Namen tippen → Sicherheitsnummer vergleichen.
 Damit es im Hintergrund zuverlässig läuft: Chat → Tipps → Akku-Optimierung ausschalten.
 
 **Mehrere Chat-Konten:** Im Chat oben auf das Konto tippen → „Neues Konto“ (z. B. „Arbeit“). Jedes Konto hat eigenen Namen, eigene Tor-Adresse, eigene Kontakte und einen eigenen QR-Code. Über „Schutz & Verstecken“ lässt sich ein Konto wie ein Galerie-Ordner mit Passwort, Tresor-PIN oder Systemsperre schützen und verstecken. Versteckte Konten holst du hervor, indem du lange auf „Chat“ drückst und den Code eingibst. Die Daten geschützter Konten sind mit dem eigenen Konto-Schlüssel verschlüsselt. Nachrichten an ein gesperrtes Konto werden gesammelt und erscheinen nach dem Öffnen.

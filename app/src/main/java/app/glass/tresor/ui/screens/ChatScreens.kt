@@ -481,7 +481,7 @@ private fun ChatSetup(name: String, onName: (String) -> Unit, account: String, o
             TipLine(Ic.qr, "Kontakt per QR-Code", "Ihr scannt eure Codes – niemand kann sich dazwischenschalten.")
             TipLine(Ic.lock, "Ende-zu-Ende verschlüsselt", "Nur ihr beide könnt die Nachrichten lesen.")
             TipLine(Ic.globe, "Über Tor", "Niemand sieht, wer mit wem schreibt.")
-            TipLine(Ic.clock, "Beide müssen online sein", "Nachrichten werden zugestellt, sobald beide Handys erreichbar sind.")
+            TipLine(Ic.clock, "Kommt automatisch an", "Ist der andere offline, wartet die Nachricht verschlüsselt auf deinem Handy. Sobald er wieder online ist, meldet sich sein Handy und sie wird sofort zugestellt – ohne Server.")
         }
         Spacer(Modifier.height(18.dp))
         GlassField(name, onName, "Dein Anzeigename (frei wählbar)")
@@ -1230,7 +1230,7 @@ fun ChatTipsScreen() {
             Spacer(Modifier.height(16.dp))
             Column(Modifier.fillMaxWidth().glass(sq(24)).padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 TipLine(Ic.globe, "Kein Server", "Dein Handy ist über eine geheime Tor-Adresse direkt erreichbar. Es gibt keinen Server, der etwas speichern oder mitlesen könnte.")
-                TipLine(Ic.clock, "Beide müssen online sein", "Eine Nachricht kommt an, sobald beide Handys gleichzeitig online sind. Bis dahin wartet sie verschlüsselt auf deinem Handy (Uhr-Symbol).")
+                TipLine(Ic.clock, "Kommt automatisch an", "Ist der andere offline, wartet die Nachricht verschlüsselt auf deinem Handy (Uhr-Symbol). Kommt er wieder online, gibt sein Handy kurz Bescheid und deins schickt sie sofort nach – ganz ohne Server. Auch beim Wechsel von WLAN zu Mobilfunk wird gleich neu versucht.")
                 TipLine(Ic.lock, "Sicherheitsnummer vergleichen", "Tippt im Gespräch auf den Namen und vergleicht die Nummer. Stimmt sie überein, schreibt ihr garantiert miteinander.")
                 TipLine(Ic.shield, "Jeder Tresor hat seinen eigenen Chat", "Kontakte und Nachrichten eines Tresors sind in den anderen Tresoren unsichtbar.")
                 TipLine(Ic.mic, "Sprachnachrichten", "Mikrofon-Taste tippen, sprechen, senden. Bis zu 5 Minuten. Die Aufnahme liegt danach nur verschlüsselt im Tresor.")

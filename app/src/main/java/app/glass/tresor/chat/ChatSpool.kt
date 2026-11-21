@@ -157,6 +157,33 @@ object ChatSpool {
         }
     }
 
+    // ───── Kontakt-Adressen für „Ich bin wieder da“ (mit Hardware-Schlüssel verschlüsselt) ─────
+
+    /** Tor-Adressen der bestätigten Kontakte – der Dienst meldet sich dort, sobald er wieder online ist. */
+    fun setPeers(ctx: Context, slot: String, onions: Set<String>) {
+        try {
+            val f = File(dir(ctx, slot, "cfg"), "peers.bin")
+            if (onions.isEmpty()) { f.delete(); return }
+            val arr = JSONArray(); onions.sorted().forEach { arr.put(it) }
+            val bytes = arr.toString().toByteArray()
+            // Nur schreiben, wenn sich etwas geändert hat
+            if (f.exists() && try { open(f.readBytes()).contentEquals(bytes) } catch (e: Exception) { false }) return
+            Crypto.writeAtomic(f, seal(bytes))
+        } catch (_: Exception) {
+        }
+    }
+
+    /** Alle Kontakt-Adressen aller angemeldeten Tresore/Konten. */
+    fun peers(ctx: Context): Set<String> = registry(ctx).flatMap { e ->
+        val f = File(File(slotDir(ctx, e.slot), "cfg"), "peers.bin")
+        if (!f.exists()) emptyList() else try {
+            val arr = JSONArray(String(open(f.readBytes())))
+            (0 until arr.length()).map { arr.getString(it) }
+        } catch (ex: Exception) {
+            emptyList()
+        }
+    }.toSet()
+
     /** Absender eines Pakets (öffentlicher Schlüssel steht unverschlüsselt im Kopf, der Inhalt nicht). */
     fun senderOf(frame: ByteArray): String? = try {
         JSONObject(String(frame)).optString("f").ifEmpty { null }
