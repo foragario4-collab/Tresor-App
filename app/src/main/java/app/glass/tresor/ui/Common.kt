@@ -114,7 +114,7 @@ fun Thumb(vault: Vault, fid: String, item: Item, modifier: Modifier = Modifier, 
         }
         if (!item.hasThumb && item.type != ItemType.IMAGE) {
             Icon(
-                if (item.type == ItemType.VIDEO) Ic.video else Ic.file, null, tint = Color.White.copy(alpha = 0.8f),
+                when (item.type) { ItemType.VIDEO -> Ic.video; ItemType.AUDIO -> Ic.music; else -> Ic.file }, null, tint = Color.White.copy(alpha = 0.8f),
                 modifier = Modifier.align(Alignment.Center).size(26.dp)
             )
         }
@@ -249,6 +249,7 @@ class ImportActions(
     val pickFiles: () -> Unit,
     val takePhoto: () -> Unit,
     val takeVideo: () -> Unit,
+    val pickAudio: () -> Unit = {},
 )
 
 private val stamp get() = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.GERMANY).format(Date())
@@ -370,6 +371,14 @@ fun rememberImport(vault: Vault, targetFid: () -> String?, onDone: (Int) -> Unit
                 } catch (e: Exception) {
                     App.suppressLock = false
                     App.toast("Keine Kamera-App gefunden")
+                }
+            },
+            pickAudio = {
+                App.suppressLock = true
+                try {
+                    docs.launch(arrayOf("audio/*", "application/ogg"))
+                } catch (e: Exception) {
+                    App.suppressLock = false
                 }
             },
         )

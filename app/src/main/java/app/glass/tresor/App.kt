@@ -23,7 +23,8 @@ enum class Disguise(val alias: String, val title: String) {
     RECHNER("app.glass.tresor.alias.Rechner", "Rechner"),
     KALENDER("app.glass.tresor.alias.Kalender", "Kalender"),
     CHECKLISTE("app.glass.tresor.alias.Checkliste", "Checkliste"),
-    NEWS("app.glass.tresor.alias.News", "News");
+    NEWS("app.glass.tresor.alias.News", "News"),
+    MUSIK("app.glass.tresor.alias.Musik", "Musik");
 
     companion object {
         fun fromAlias(cls: String?): Disguise? = entries.firstOrNull { it.alias == cls }
@@ -47,6 +48,7 @@ sealed interface Screen {
     data object ChatCode : Screen
     data object ChatTips : Screen
     data object ChatAdd : Screen
+    data object Player : Screen
     data class FolderSettings(val fid: String) : Screen
 }
 
@@ -292,6 +294,7 @@ object App {
         if (vault == null && nav.top == Screen.Disguise) return
         beforeLock.toList().forEach { it() }
         app.glass.tresor.chat.Calls.onVaultLocked()
+        app.glass.tresor.music.MusicPlayer.onVaultLocked()
         app.glass.tresor.chat.ChatAccounts.reset()
         app.glass.tresor.chat.VoicePlayer.stop()
         app.glass.tresor.chat.ChatEngine.close()

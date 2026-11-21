@@ -69,6 +69,7 @@ object Media {
     fun typeOf(mime: String): ItemType = when {
         mime.startsWith("image/") -> ItemType.IMAGE
         mime.startsWith("video/") -> ItemType.VIDEO
+        mime.startsWith("audio/") || mime == "application/ogg" -> ItemType.AUDIO
         else -> ItemType.FILE
     }
 
@@ -160,6 +161,30 @@ object Media {
     }
 
     /** Liest Datei vom System, verschlüsselt sie direkt in den Ordner und erzeugt die Vorschau. */
+    class AudioInfo(val durationMs: Long, val title: String?, val artist: String, val cover: Bitmap?)
+
+    fun audioInfo(ctx: Context, uri: Uri): AudioInfo {
+        val r = android.media.MediaMetadataRetriever()
+        return try {
+            r.setDataSource(ctx, uri)
+            val dur = r.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+            val title = r.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_TITLE)?.trim()
+            val artist = r.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_ARTIST)?.trim() ?: ""
+            val cover = r.embeddedPicture?.let { pic ->
+                val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeByteArray(pic, 0, pic.size, o)
+                var sample = 1
+                while (maxOf(o.outWidth, o.outHeight) / sample > 960) sample *= 2
+                BitmapFactory.decodeByteArray(pic, 0, pic.size, BitmapFactory.Options().apply { inSampleSize = sample })
+            }
+            AudioInfo(dur, title, artist, cover)
+        } catch (e: Exception) {
+            AudioInfo(0, null, "", null)
+        } finally {
+            try { r.release() } catch (_: Exception) {}
+        }
+    }
+
     fun importUri(ctx: Context, vault: Vault, fid: String, uri: Uri, forcedName: String? = null): Item? {
         val m = meta(ctx, uri)
         val type = typeOf(m.mime)
@@ -168,6 +193,8 @@ object Media {
         var h = 0
         var dur = 0L
         var thumb: ByteArray? = null
+        var title: String? = null
+        var artist = ""
         val open = { ctx.contentResolver.openInputStream(uri) ?: throw IllegalStateException("nicht lesbar") }
         when (type) {
             ItemType.IMAGE -> {
@@ -185,13 +212,26 @@ object Media {
                     b.recycle()
                 }
             }
+            ItemType.AUDIO -> {
+                // Musik: Länge, Titel, Interpret und Cover aus der Datei lesen
+                val ai = audioInfo(ctx, uri)
+                dur = ai.durationMs; title = ai.title; artist = ai.artist
+                ai.cover?.let { b ->
+                    val longest = maxOf(b.width, b.height)
+                    val s = if (longest > 480) Bitmap.createScaledBitmap(b, b.width * 480 / longest, b.height * 480 / longest, true) else b
+                    thumb = jpeg(s)
+                    if (s !== b) s.recycle()
+                    b.recycle()
+                }
+            }
             else -> {}
         }
         val now = System.currentTimeMillis()
         val meta = Item(
-            id = vault.newItemId(), name = name, mime = m.mime, type = type,
+            id = vault.newItemId(), name = if (forcedName == null && !title.isNullOrBlank()) title!! else name,
+            mime = m.mime, type = type,
             size = m.size, created = now, modified = now, width = w, height = h,
-            durationMs = dur
+            durationMs = dur, artist = artist
         )
         return try {
             open().use { input -> vault.importStream(fid, input, meta, thumb) }

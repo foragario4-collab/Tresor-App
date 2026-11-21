@@ -80,6 +80,8 @@ fun kindTitle(kind: FolderKind, filter: ItemType?) = when {
     kind == FolderKind.MEDIA && filter == ItemType.VIDEO -> "Videos"
     kind == FolderKind.MEDIA -> "Fotos"
     kind == FolderKind.FILES -> "Dateien"
+    kind == FolderKind.MUSIC -> "Musik"
+    kind == FolderKind.CHAT -> "Chat"
     else -> "Notizen"
 }
 
@@ -99,6 +101,12 @@ fun AlbumsScreen(kind: FolderKind, filter: ItemType?) {
     var newFolder by remember { mutableStateOf(false) }
     var unlockTarget by remember { mutableStateOf<Pair<Folder, Boolean>?>(null) } // Ordner, danach Einstellungen?
 
+    // Ältere Tresore haben noch keinen Musik-Ordner → beim ersten Öffnen anlegen
+    androidx.compose.runtime.LaunchedEffect(kind) {
+        if (kind == FolderKind.MUSIC && vault.folders.none { it.kind == FolderKind.MUSIC }) {
+            try { vault.createFolder("Musik", FolderKind.MUSIC) } catch (_: Exception) {}
+        }
+    }
     val all = vault.folders.filter { it.kind == kind }
     val normal = all.filter { !it.isProtected && !it.hidden }
     // Ausgeblendete Ordner sind unsichtbar, bis ihr Code (oder der Fingerabdruck) sie hervorholt
@@ -180,7 +188,7 @@ fun AlbumsScreen(kind: FolderKind, filter: ItemType?) {
 private fun FolderCard(vault: Vault, f: Folder, filter: ItemType?, onLong: () -> Unit, onClick: () -> Unit) {
     val unlocked = f.id in vault.unlockedFolders
     val items = if (unlocked) folderItems(vault, f.id, filter) else emptyList()
-    val cover = items.firstOrNull { it.type == ItemType.IMAGE || it.type == ItemType.VIDEO }
+    val cover = items.firstOrNull { it.type == ItemType.IMAGE || it.type == ItemType.VIDEO || (it.type == ItemType.AUDIO && it.hasThumb) }
     // Nicht die ganze Spalte abrunden – sonst schneidet die Ecke die Beschriftung darunter an.
     // Drück-Effekt: ganze Karte federt, das Aufhellen passiert nur im abgerundeten Bild.
     val src = remember { MutableInteractionSource() }
@@ -215,6 +223,7 @@ private fun FolderCard(vault: Vault, f: Folder, filter: ItemType?, onLong: () ->
                         FolderKind.FILES -> Ic.folder
                         FolderKind.NOTES -> Ic.note
                         FolderKind.CHAT -> Ic.chat
+                        FolderKind.MUSIC -> Ic.music
                     },
                     Color.White.copy(alpha = 0.16f), size = 56.dp, radius = 16, iconSize = 26.dp
                 )

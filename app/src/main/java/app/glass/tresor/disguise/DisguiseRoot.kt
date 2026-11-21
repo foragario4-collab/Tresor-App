@@ -13,6 +13,7 @@ fun DisguiseRoot() {
         Disguise.KALENDER -> CalendarApp()
         Disguise.CHECKLISTE -> ChecklistApp()
         Disguise.NEWS -> NewsApp()
+        Disguise.MUSIK -> MusicApp()
     }
 }
 

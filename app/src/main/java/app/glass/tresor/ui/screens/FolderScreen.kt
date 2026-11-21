@@ -70,6 +70,7 @@ import app.glass.tresor.ui.Thumb
 import app.glass.tresor.ui.TopBar
 import app.glass.tresor.ui.dateFmt
 import app.glass.tresor.ui.formatSize
+import app.glass.tresor.ui.formatDuration
 import app.glass.tresor.ui.glass
 import app.glass.tresor.ui.pressable
 import app.glass.tresor.ui.rememberExport
@@ -170,6 +171,7 @@ fun FolderScreen(fid: String, filter: ItemType?) {
                 item { header() }
                 if (items.isEmpty()) item {
                     if (folder.kind == FolderKind.NOTES) EmptyState(Ic.note, "Keine Notizen", "Tippe unten auf „Neue Notiz“.")
+                    else if (folder.kind == FolderKind.MUSIC) EmptyState(Ic.music, "Noch keine Musik", "Füge MP3-, M4A-, FLAC- oder andere Musikdateien hinzu.")
                     else EmptyState(Ic.folder, "Keine Dateien", "Füge Dokumente, PDFs oder beliebige Dateien hinzu.")
                 }
                 items(items, key = { it.id }) { item ->
@@ -212,6 +214,15 @@ fun FolderScreen(fid: String, filter: ItemType?) {
                     FolderKind.FILES -> BarButton(Ic.plus, "Datei hinzufügen") { import.pickFiles() }
                     FolderKind.NOTES -> BarButton(Ic.edit, "Neue Notiz") { App.nav.push(Screen.NoteEdit(fid, null)) }
                     FolderKind.CHAT -> {}
+                    FolderKind.MUSIC -> {
+                        BarButton(Ic.plus, "Musik hinzufügen") { import.pickAudio() }
+                        if (items.any { it.type == ItemType.AUDIO }) RoundBarButton(Ic.shuffle, "Zufällig abspielen") {
+                            val list = items.filter { it.type == ItemType.AUDIO }.map { fid to it }
+                            if (!app.glass.tresor.music.MusicPlayer.shuffle) app.glass.tresor.music.MusicPlayer.toggleShuffle()
+                            app.glass.tresor.music.MusicPlayer.play(vault, list, list.indices.random())
+                            App.nav.push(Screen.Player)
+                        }
+                    }
                 }
             }
         }
@@ -322,7 +333,11 @@ private fun ListRow(
         Column(Modifier.weight(1f)) {
             Text(item.name.ifBlank { "Ohne Titel" }, style = G.body.copy(fontSize = 16.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
-                if (isNote) dateFmt.format(Date(item.modified)) else "${formatSize(item.size)} · ${dateFmt.format(Date(item.created))}",
+                when {
+                    isNote -> dateFmt.format(Date(item.modified))
+                    item.type == ItemType.AUDIO -> item.artist.ifBlank { "Unbekannter Interpret" } + " · " + formatDuration(item.durationMs)
+                    else -> "${formatSize(item.size)} · ${dateFmt.format(Date(item.created))}"
+                },
                 style = G.footnote
             )
         }

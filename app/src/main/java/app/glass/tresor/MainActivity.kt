@@ -203,9 +203,11 @@ private fun Root() {
                 Screen.ChatCode -> app.glass.tresor.ui.screens.ChatCodeScreen()
                 Screen.ChatTips -> app.glass.tresor.ui.screens.ChatTipsScreen()
                 Screen.ChatAdd -> app.glass.tresor.ui.screens.ChatAddScreen()
+                Screen.Player -> app.glass.tresor.ui.screens.PlayerScreen()
             }
         }
         app.glass.tresor.ui.screens.ChatBanner(Modifier.align(Alignment.TopCenter))
+        app.glass.tresor.ui.screens.MiniPlayer(Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 96.dp))
         app.glass.tresor.ui.screens.CallOverlay()
         Toast(Modifier.align(Alignment.BottomCenter))
     }

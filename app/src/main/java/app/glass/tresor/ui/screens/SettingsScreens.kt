@@ -118,6 +118,7 @@ fun SettingsScreen() {
                     ChoiceRow(Ic.calendar, Color(0xFFE5484D), "Kalender", "Heutiges Datum lange drücken", App.disguise == Disguise.KALENDER) { App.applyDisguise(Disguise.KALENDER) }
                     ChoiceRow(Ic.checklist, Color(0xFF2F9E5B), "Checkliste", "Eintrag mit deinem Code anlegen", App.disguise == Disguise.CHECKLISTE) { App.applyDisguise(Disguise.CHECKLISTE) }
                     ChoiceRow(Ic.news, G.blue, "News", "Titel „News“ lange drücken", App.disguise == Disguise.NEWS) { App.applyDisguise(Disguise.NEWS) }
+                    ChoiceRow(Ic.music, Color(0xFFF2545B), "Musik", "Echter Musikplayer · Code ins Suchfeld, dann Suchen", App.disguise == Disguise.MUSIK) { App.applyDisguise(Disguise.MUSIK) }
                 }
                 Text(
                     "Das neue Icon erscheint nach ein paar Sekunden. Manche Startbildschirme brauchen einen Neustart des Launchers.",
@@ -205,6 +206,15 @@ fun SettingsScreen() {
                     }
                     SettingRow("Sperre beim Umdrehen", "Display nach unten legen sperrt sofort", showDivider = true) {
                         GlassSwitch(App.flipLock, "Umdrehen") { App.changeFlipLock(it) }
+                    }
+                    var musicBg by remember { mutableStateOf(App.prefs.getBoolean("musicBackground", false)) }
+                    SettingRow("Musik im Hintergrund", "Aktuelles Lied läuft weiter, auch wenn der Tresor sperrt", showDivider = true) {
+                        GlassSwitch(musicBg, "Musik im Hintergrund") {
+                            musicBg = it
+                            App.prefs.edit().putBoolean("musicBackground", it).apply()
+                            if (it && app.glass.tresor.music.MusicPlayer.active) app.glass.tresor.music.MusicService.start(App.ctx)
+                            if (!it) app.glass.tresor.music.MusicService.stop(App.ctx)
+                        }
                     }
                     SettingRow("Originale nach Import löschen", "Android fragt nach, bevor Fotos aus der Galerie gelöscht werden", showDivider = true) {
                         GlassSwitch(delOrig, "Originale löschen") { delOrig = it; App.prefs.edit().putBoolean("deleteOriginals", it).apply() }

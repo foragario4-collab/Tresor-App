@@ -79,4 +79,11 @@ object Ic {
     val pause = filled("pause", "M7 5h3.5v14H7z M13.5 5H17v14h-3.5z")
     val stop = filled("stop", "M7 7h10v10H7z")
     val chevronDown = stroke("chevronDown", "M6 9l6 6l6 -6")
+
+    // Musik
+    val music = stroke("music", "M9 18V6l11 -2v12 M9 18a3 3 0 1 1 -6 0a3 3 0 1 1 6 0z M20 16a3 3 0 1 1 -6 0a3 3 0 1 1 6 0z")
+    val next = filled("next", "M5 5.5v13l9 -6.5z M14 5.5v13l7 -6.5z")
+    val prev = filled("prev", "M19 5.5v13l-9 -6.5z M10 5.5v13l-7 -6.5z")
+    val shuffle = stroke("shuffle", "M3 7h3c4 0 6 10 10 10h4 M17 14l3 3l-3 3 M3 17h3c1.6 0 2.8 -1.6 3.9 -3.5 M13.2 9.3C14 8 15 7 16 7h4 M17 4l3 3l-3 3")
+    val repeat = stroke("repeat", "M4 11V9a3 3 0 0 1 3 -3h13 M17 3l3 3l-3 3 M20 13v2a3 3 0 0 1 -3 3H4 M7 21l-3 -3l3 -3")
 }

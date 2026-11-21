@@ -3,9 +3,9 @@ package app.glass.tresor.vault
 import org.json.JSONObject
 
 /** CHAT = ein weiteres Chat-Konto (eigene Identität, eigene Kontakte), geschützt wie ein Ordner. */
-enum class FolderKind { MEDIA, FILES, NOTES, CHAT }
+enum class FolderKind { MEDIA, FILES, NOTES, CHAT, MUSIC }
 enum class Protection { NONE, PIN, PASSWORD, SYSTEM }
-enum class ItemType { IMAGE, VIDEO, FILE, NOTE }
+enum class ItemType { IMAGE, VIDEO, FILE, NOTE, AUDIO }
 
 data class Folder(
     val id: String,
@@ -58,11 +58,13 @@ data class Item(
     val height: Int = 0,
     val durationMs: Long = 0,
     val hasThumb: Boolean = false,
+    val artist: String = "",
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("id", id); put("name", name); put("mime", mime); put("type", type.name)
         put("size", size); put("created", created); put("modified", modified)
         put("w", width); put("h", height); put("dur", durationMs); put("thumb", hasThumb)
+        if (artist.isNotEmpty()) put("ar", artist)
     }
 
     companion object {
@@ -78,6 +80,7 @@ data class Item(
             height = o.optInt("h"),
             durationMs = o.optLong("dur"),
             hasThumb = o.optBoolean("thumb"),
+            artist = o.optString("ar"),
         )
     }
 }

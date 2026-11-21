@@ -63,6 +63,13 @@ fun openItem(fid: String, item: Item, filter: ItemType?) {
         ItemType.NOTE -> App.nav.push(Screen.NoteEdit(fid, item.id))
         ItemType.IMAGE, ItemType.VIDEO -> App.nav.push(Screen.Viewer(fid, item.id, filter))
         ItemType.FILE -> App.nav.push(Screen.TextView(fid, item.id))
+        ItemType.AUDIO -> {
+            val v = App.vault ?: return
+            // Ganzen Ordner als Wiedergabeliste, beginnend beim angetippten Lied
+            val list = v.itemsOf(fid).filter { it.type == ItemType.AUDIO }.map { fid to it }
+            app.glass.tresor.music.MusicPlayer.play(v, list, list.indexOfFirst { it.second.id == item.id }.coerceAtLeast(0))
+            App.nav.push(Screen.Player)
+        }
     }
 }
 
@@ -123,12 +130,15 @@ fun HomeScreen() {
                         }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        CategoryCard(Modifier.weight(1f), Ic.music, Color(0xFFE5484D), "Musik", count(FolderKind.MUSIC, null)) {
+                            App.nav.push(Screen.Albums(FolderKind.MUSIC, null))
+                        }
                         ToolCard(Modifier.weight(1f), Ic.chat, Color(0xFF30A46C), "Chat", "Über Tor") {
                             App.nav.push(Screen.Chat)
                         }
-                        ToolCard(Modifier.weight(1f), Ic.globe, Color(0xFF3E63DD), "Browser", "Ohne Spuren") {
-                            App.nav.push(Screen.Browser)
-                        }
+                    }
+                    ToolCard(Modifier.fillMaxWidth(), Ic.globe, Color(0xFF3E63DD), "Browser", "Ohne Spuren") {
+                        App.nav.push(Screen.Browser)
                     }
                 }
 

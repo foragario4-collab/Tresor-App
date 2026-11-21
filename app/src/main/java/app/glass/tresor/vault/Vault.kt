@@ -96,6 +96,7 @@ class Vault(val slot: String, val dir: File) {
         newFolderInternal("Fotos", FolderKind.MEDIA)
         newFolderInternal("Dateien", FolderKind.FILES)
         newFolderInternal("Notizen", FolderKind.NOTES)
+        newFolderInternal("Musik", FolderKind.MUSIC)
         saveRoot()
     }
 
@@ -218,6 +219,7 @@ class Vault(val slot: String, val dir: File) {
         newFolderInternal("Fotos", FolderKind.MEDIA)
         newFolderInternal("Dateien", FolderKind.FILES)
         newFolderInternal("Notizen", FolderKind.NOTES)
+        newFolderInternal("Musik", FolderKind.MUSIC)
         saveRoot()
     }
 

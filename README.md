@@ -80,6 +80,14 @@ Damit es im Hintergrund zuverlässig läuft: Chat → Tipps → Akku-Optimierung
 - Ein Anruf klingelt auch bei gesperrtem Tresor (Mitteilung „Eingehender Anruf“, ohne Namen). Annehmen kannst du ihn nach dem Entsperren des richtigen Tresors, innerhalb von 45 Sekunden.
 - Wenn du die App verlässt oder mit der Seitentaste sperrst, endet das Gespräch. Am Ohr schaltet der Näherungssensor den Bildschirm ab, das Gespräch läuft dabei weiter.
 
+## Musik
+
+Neue Kategorie „Musik“ auf der Startseite: eigene Ordner, Import von MP3, M4A, FLAC, OGG und anderen Formaten (Titel, Interpret und Cover werden übernommen). Originale können wie bei Fotos danach gelöscht werden.
+- Player im Apple-Stil: Cover, Fortschritt zum Ziehen, Zurück, Abspielen/Pause, Weiter, Zufall, Wiederholen (alle / ein Lied). Unten erscheint ein Mini-Player.
+- Das laufende Lied wird nur im Arbeitsspeicher entschlüsselt, nie als Datei.
+- „Musik im Hintergrund“ (Einstellungen, standardmäßig aus): Das aktuelle Lied läuft weiter, auch wenn der Tresor sperrt. Die Mitteilung zeigt nur „Wiedergabe“, ohne Titel. Das nächste Lied gibt es erst nach dem Entsperren.
+- Tarnung „Musik“: ein echter Musikplayer für die normale Musik auf dem Handy. Code ins Suchfeld tippen und „Suchen“ drücken öffnet den Tresor.
+
 ## Privater Browser
 
 Startseite → Browser. Kein Verlauf, Cookies und Website-Daten werden beim Sperren gelöscht.
