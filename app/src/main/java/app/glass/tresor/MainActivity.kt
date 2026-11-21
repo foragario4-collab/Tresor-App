@@ -71,7 +71,9 @@ class MainActivity : FragmentActivity() {
     private val screenOff = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             // Während eines Gesprächs schaltet der Näherungssensor den Bildschirm am Ohr ab – dann nicht sperren
-            if (!app.glass.tresor.chat.Calls.busy) App.lock()
+            if (app.glass.tresor.chat.Calls.busy) return
+            // "Sofort" und "Bildschirm aus" sperren hier; bei den Zeit-Varianten zählt die Zeit ab onStop
+            if (App.lockMode == "now" || App.lockMode == "screen") App.lock()
         }
     }
 
@@ -105,18 +107,30 @@ class MainActivity : FragmentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        App.checkTimedLock()
+    }
+
     override fun onResume() {
         super.onResume()
         App.suppressLock = false
     }
 
-    /** Sofort-Sperre: sobald die App nicht mehr sichtbar ist. */
+    /** Sperre beim Verlassen – je nach Einstellung sofort oder später. */
     override fun onStop() {
         super.onStop()
-        if (!App.suppressLock && !isChangingConfigurations) App.lock()
+        if (App.suppressLock || isChangingConfigurations) return
+        when (App.lockMode) {
+            "now" -> App.lock()
+            "1", "5", "15" -> App.backgroundSince = android.os.SystemClock.elapsedRealtime()
+            else -> {} // "screen": Bildschirm-aus-Empfänger · "close": erst wenn die App beendet wird
+        }
     }
 
     override fun onDestroy() {
+        // App wird geschlossen (z. B. aus den letzten Apps weggewischt) → immer sperren
+        if (isFinishing && !isChangingConfigurations) App.lock()
         try {
             unregisterReceiver(screenOff)
         } catch (_: Exception) {
@@ -202,8 +216,11 @@ private fun Root() {
                 is Screen.ChatThread -> app.glass.tresor.ui.screens.ChatThreadScreen(s.contactId)
                 Screen.ChatCode -> app.glass.tresor.ui.screens.ChatCodeScreen()
                 Screen.ChatTips -> app.glass.tresor.ui.screens.ChatTipsScreen()
+                Screen.Handbook -> app.glass.tresor.ui.screens.HandbookScreen()
                 Screen.ChatAdd -> app.glass.tresor.ui.screens.ChatAddScreen()
                 Screen.Player -> app.glass.tresor.ui.screens.PlayerScreen()
+                is Screen.CategorySettings -> app.glass.tresor.ui.screens.CategorySettingsScreen(s.kind)
+                is Screen.Camera -> app.glass.tresor.ui.screens.CameraScreen(s.fid, s.video)
             }
         }
         app.glass.tresor.ui.screens.ChatBanner(Modifier.align(Alignment.TopCenter))

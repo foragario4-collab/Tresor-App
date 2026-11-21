@@ -1,6 +1,6 @@
 # Tresor
 
-Verschlüsselter Tresor für Fotos, Videos, Dateien und Notizen, getarnt als Rechner, Kalender, Checkliste oder News-App. Liquid-Glass-Design.
+Verschlüsselter Tresor für Fotos, Videos, Dateien, Notizen und Musik, mit Chat und Anrufen über Tor. Getarnt als Rechner, Kalender, Checkliste, News, Musik, Notizen, Wetter oder Browser. Liquid-Glass-Design. Ein Handbuch ist in der App eingebaut (Einstellungen → Handbuch).
 
 ## APK bauen (GitHub)
 
@@ -28,17 +28,31 @@ Weil jede Version mit demselben Schlüssel signiert ist, lassen sich Updates ein
 
 | Tarnung | So öffnet sich der Tresor |
 |---|---|
-| Rechner | Code eintippen, dann `=` |
+| Rechner | Code eintippen (ohne Rechenzeichen), dann `=` |
 | Kalender | Das heutige Datum lange drücken |
 | Checkliste | Den Code als neuen Eintrag eingeben |
 | News | Den Titel „News“ lange drücken |
+| Musik | Code ins Suchfeld, dann „Suchen“ |
+| Notizen | Code ins Suchfeld, dann „Suchen“ |
+| Wetter | Code in die Städtesuche, oder den Stadtnamen lange drücken |
+| Browser | Code in die Adresszeile, dann „Los“ |
 
-Tarnung wechseln: Tresor → Einstellungen → Tarnung.
+Tarnung wechseln: Tresor → Einstellungen → Tarnung. Alle Tarn-Apps funktionieren wirklich:
+- **Rechner** wie beim Samsung: ganzer Rechenweg mit Klammern und Prozent, das Ergebnis erscheint schon beim Tippen.
+- **News** mit Bildern (ORF, Der Standard, Tagesschau).
+- **Wetter** (Open-Meteo, ohne Konto): Stadt suchen, optional „Mit GPS orten“ (weniger privat, braucht die Standort-Erlaubnis). Dazu gibt es ein Widget für den Startbildschirm, solange die Wetter-Tarnung aktiv ist.
+- **Browser** mit Tabs, Favoriten und Werbeblocker.
+
+**App komplett verstecken:** Einstellungen → „App verstecken“. Das Symbol verschwindet ganz. Öffnen über die Telefon-App: `*#*#8737#*#*` wählen (manche Handys zeigen stattdessen eine Mitteilung „Tippen zum Öffnen“).
+
+## Kategorien mit eigenem Schlüssel
+
+Fotos & Videos, Dateien, Notizen und Musik können je einen eigenen Schlüssel bekommen: PIN, Passwort oder Fingerabdruck/Gesicht (Gesicht nur, wenn das Handy es als „stark“ einstuft). Dazu die Kategorie auf der Startseite lange drücken. Ohne diesen Schlüssel ist der Inhalt auch bei offenem Tresor nicht lesbar.
 
 ## Geschützte Ordner
 
 Ordner lange drücken → Schutz wählen: Tresor-PIN, eigenes Passwort oder Systemsperre (Fingerabdruck, die PIN funktioniert immer als Notfall).
-„Ordner verstecken“ macht ihn komplett unsichtbar. Hervorholen: lange auf den Titel drücken (Fotos / Videos / Dateien / Notizen) und den Code eingeben.
+„Ordner verstecken“ macht ihn komplett unsichtbar. Hervorholen: unten die Leiste „Neuer Ordner“ lange drücken (gut mit dem Daumen erreichbar) oder lange auf den Titel drücken und den Code eingeben. Das Schloss am Ordner versteckt ihn sofort wieder.
 
 - Ein Code öffnet genau die Ordner, die diesen Code als Passwort haben (z. B. 4711 → „Urlaub“ und „Privat“, 9999 → nur „Geheim“).
 - „Mit Fingerabdruck“ öffnet mit einem einzigen Abdruck alle Ordner mit Systemsperre.
@@ -90,9 +104,30 @@ Neue Kategorie „Musik“ auf der Startseite: eigene Ordner, Import von MP3, M4
 
 ## Privater Browser
 
-Startseite → Browser. Kein Verlauf, Cookies und Website-Daten werden beim Sperren gelöscht.
+Startseite → Browser. Kein Verlauf, Cookies und Website-Daten werden beim Sperren gelöscht. Mehrere Tabs (Symbol mit der Zahl unten rechts), Favoriten, JavaScript abschaltbar.
+
+**Über Tor surfen** (Menü ⋯): Alle Seiten laufen über Tor, Webseiten sehen deine IP nicht, .onion-Adressen funktionieren. Solange Tor nicht verbunden ist, lädt der Browser gar nichts, damit nie etwas am Tor vorbei geht. WebRTC (kann sonst die echte IP verraten) ist gesperrt. „Neue Tor-Identität“ baut neue Wege auf. Für höchste Anonymität gibt es „Im echten Tor Browser öffnen“ (die Tor-Browser-App muss installiert sein).
+
+**VPN:** Proton VPN lässt sich nicht in die App einbauen. Läuft die Proton-App, geht der Browser automatisch darüber, das Menü zeigt dann „VPN aktiv“.
+
+**Geheime Bereiche:** Oben auf den Bereichsnamen tippen → „Neuer Bereich“. Jeder Bereich hat eigene Tabs und Favoriten und lässt sich über „Schutz & Verstecken“ wie ein Ordner schützen und verstecken. Lange auf den Bereichsnamen drücken holt versteckte Bereiche per Code hervor.
+
 Lesezeichen sind verschlüsselt, Downloads landen verschlüsselt unter Dateien → Downloads.
 Werbeblocker: blockiert Werbung und Tracker mit EasyList und EasyPrivacy (dieselben Listen wie uBlock und Brave). GitHub lädt sie bei jedem Build frisch herunter. Das Schild oben zeigt, wie viel blockiert wurde. Dort kannst du den Blocker pro Seite oder ganz ausschalten.
+
+## Chat-Details
+
+- Auf „Tor verbunden“ tippen zeigt, über welche Knoten (Land, Name, IP) die Verbindungen gerade laufen.
+- „Kontakt hinzufügen“: oben die Kamera, darunter dein QR-Code und dein Code als Text zum Kopieren.
+
+## Eigene Kamera und eigene Tastatur
+
+- Fotos und Videos aus der eingebauten Kamera landen direkt verschlüsselt im Tresor, nie in der Galerie. Ortsdaten werden entfernt.
+- Codes und Passwörter werden über die eingebaute Tastatur getippt, damit keine fremde Tastatur-App mitlesen kann (abschaltbar).
+
+## Sperren
+
+Einstellungen → „Sperren“: sofort beim Verlassen, bei Displaysperre, nach 1 / 5 / 15 Minuten oder erst beim Schließen der App.
 
 ## Notfall-Löschcode
 
@@ -100,6 +135,8 @@ Einstellungen → „Notfall-Löschcode“. Wird dieser Code irgendwo eingegeben
 1. Die Schlüssel im Hardware-Chip werden gelöscht. Damit sind alle Daten sofort unlesbar.
 2. Alle Dateien werden gelöscht.
 3. Ein neuer, leerer Tresor öffnet sich. Sein Code ist der Löschcode, von außen sieht es aus wie ein ganz normaler leerer Tresor.
+
+Zusätzlich kann jeder Tresor einen eigenen Löschcode haben, der nur diesen einen Tresor löscht.
 
 ## In-App-Updates
 
@@ -117,7 +154,7 @@ In der App: Einstellungen → Updates → „Prüfen“ → „Installieren“.
 - Videos werden blockweise direkt aus der verschlüsselten Datei abgespielt
 - Sperre beim Verlassen der App und bei Displaysperre, optional bei Bewegung (Empfindlichkeit per Regler) und beim Umdrehen (Display nach unten)
 - Screenshot-Sperre, Tarn-PIN mit Schein-Tresor, optional Löschen nach 10 Fehlversuchen
-- Kein Backup, keine Cloud, keine Tracker. Nur die News-Tarnung nutzt das Internet (RSS).
+- Kein Backup, keine Cloud, keine Tracker. Internet nutzen nur Chat/Tor, Browser, News (RSS) und Wetter (Open-Meteo).
 
 ## Testen mit scrcpy
 

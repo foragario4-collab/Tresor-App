@@ -6,4 +6,7 @@
     <color name="icon_checkliste">#FF2F9E5B</color>
     <color name="icon_news">#FF2F6BF6</color>
     <color name="icon_musik">#FFF2545B</color>
+    <color name="icon_notizen">#FFF5C451</color>
+    <color name="icon_wetter">#FF2F80ED</color>
+    <color name="icon_browser">#FF0E9F8E</color>
 </resources>

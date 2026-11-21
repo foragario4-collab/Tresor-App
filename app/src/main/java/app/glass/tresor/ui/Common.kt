@@ -23,6 +23,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -167,6 +168,11 @@ fun BoxScope.Sheet(visible: Boolean, onDismiss: () -> Unit, content: @Composable
     if (visible) BackHandler { onDismiss() }
 }
 
+/** Welches Passwortfeld gerade die eigene Tastatur zeigt (immer nur eines). */
+object SecureKbState {
+    var active by mutableStateOf<Any?>(null)
+}
+
 @Composable
 fun GlassField(
     value: String,
@@ -181,20 +187,31 @@ fun GlassField(
 ) {
     var show by remember { mutableStateOf(false) }
     val fr = remember { FocusRequester() }
-    if (autoFocus) LaunchedEffect(Unit) { try { fr.requestFocus() } catch (_: Exception) {} }
+    // Codes und Passwörter über die eigene Tastatur: keine fremde Tastatur-App kann mitlesen
+    val secure = password && App.prefs.getBoolean("secureKb", true)
+    val myId = remember { Any() }
+    if (autoFocus) LaunchedEffect(Unit) {
+        if (secure) SecureKbState.active = myId
+        else try { fr.requestFocus() } catch (_: Exception) {}
+    }
+    val kbOpen = secure && SecureKbState.active === myId
+    Column(modifier.fillMaxWidth()) {
     Row(
-        modifier
+        Modifier
             .fillMaxWidth()
             .height(54.dp)
             .clip(Pill)
-            .background(Color.White.copy(alpha = 0.09f))
-            .border(1.dp, Color.White.copy(alpha = 0.16f), Pill)
+            .background(Color.White.copy(alpha = if (kbOpen) 0.13f else 0.09f))
+            .border(1.dp, if (kbOpen) G.accentText.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.16f), Pill)
+            .then(if (secure) Modifier.pressable(Pill, haptic = Haptic.NONE, scaleTo = 1f, highlight = 0f) { SecureKbState.active = myId } else Modifier)
             .padding(start = 20.dp, end = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(Modifier.weight(1f)) {
             if (value.isEmpty()) Text(placeholder, style = G.body.copy(color = G.faint))
-            BasicTextField(
+            if (secure) {
+                Text(if (show) value else "•".repeat(value.length), style = G.body, maxLines = 1)
+            } else BasicTextField(
                 value = value,
                 onValueChange = onChange,
                 singleLine = singleLine,
@@ -222,6 +239,75 @@ fun GlassField(
                 Icon(if (show) Ic.eyeOff else Ic.eye, if (show) "Verbergen" else "Anzeigen", tint = G.dim, modifier = Modifier.size(20.dp))
             }
         }
+    }
+    if (kbOpen) {
+        Spacer(Modifier.height(8.dp))
+        SecureKeyboard(
+            numeric = numeric,
+            onKey = { c -> if (value.length < 64) onChange(value + c) },
+            onDelete = { if (value.isNotEmpty()) onChange(value.dropLast(1)) },
+            onDone = { SecureKbState.active = null; onDone?.invoke() }
+        )
+    }
+    }
+}
+
+/** Eingebaute Tastatur für Codes und Passwörter (QWERTZ, Zahlen, Zeichen). */
+@Composable
+fun SecureKeyboard(numeric: Boolean, onKey: (Char) -> Unit, onDelete: () -> Unit, onDone: () -> Unit) {
+    var mode by remember { mutableStateOf(if (numeric) 2 else 0) } // 0 = Buchstaben, 1 = Zeichen, 2 = Ziffern
+    var shift by remember { mutableStateOf(false) }
+    val rows: List<String> = when (mode) {
+        0 -> listOf("qwertzuiopü", "asdfghjklöä", "yxcvbnm")
+        1 -> listOf("1234567890", "-/:;()€&@\"", ".,?!'_%*+=")
+        else -> listOf("123", "456", "789")
+    }
+    Column(
+        Modifier.fillMaxWidth().clip(sq(18)).background(Color.White.copy(alpha = 0.06f)).padding(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        rows.forEachIndexed { ri, row ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                if (mode == 0 && ri == 2) KbKey(if (shift) "⇧" else "⇪", Modifier.weight(1.5f), dark = true) { shift = !shift }
+                row.forEach { ch ->
+                    val c = if (mode == 0 && shift) ch.uppercaseChar() else ch
+                    KbKey(c.toString(), Modifier.weight(1f), tall = mode == 2) { onKey(c); if (shift) shift = false }
+                }
+                if (mode == 0 && ri == 2) KbKey("⌫", Modifier.weight(1.5f), dark = true) { onDelete() }
+            }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+            if (numeric) {
+                Spacer(Modifier.weight(1f))
+                KbKey("0", Modifier.weight(1f), tall = true) { onKey('0') }
+                KbKey("⌫", Modifier.weight(1f), dark = true, tall = true) { onDelete() }
+            } else {
+                KbKey(if (mode == 0) "123" else "ABC", Modifier.weight(1.4f), dark = true) { mode = if (mode == 0) 1 else 0 }
+                KbKey("Leertaste", Modifier.weight(4f)) { onKey(' ') }
+                if (mode != 0) KbKey("⌫", Modifier.weight(1.2f), dark = true) { onDelete() }
+            }
+            KbKey("OK", Modifier.weight(if (numeric) 1f else 1.4f), accent = true, tall = numeric) { onDone() }
+        }
+    }
+}
+
+@Composable
+private fun KbKey(label: String, modifier: Modifier, dark: Boolean = false, accent: Boolean = false, tall: Boolean = false, onClick: () -> Unit) {
+    Box(
+        modifier
+            .height(if (tall) 48.dp else 42.dp)
+            .pressable(sq(10), scaleTo = 0.92f, highlight = 0.12f, haptic = Haptic.NONE) { onClick() }
+            .clip(sq(10))
+            .background(
+                when {
+                    accent -> G.accent
+                    dark -> Color.White.copy(alpha = 0.10f)
+                    else -> Color.White.copy(alpha = 0.18f)
+                }
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(label, style = G.body.copy(fontSize = if (label.length > 3) 14.sp else 18.sp, color = Color.White), maxLines = 1)
     }
 }
 
@@ -259,7 +345,6 @@ fun rememberImport(vault: Vault, targetFid: () -> String?, onDone: (Int) -> Unit
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     var busy by remember { mutableIntStateOf(0) }
-    var pendingCam by remember { mutableStateOf<File?>(null) }
 
     // Android fragt selbst nach, ob die Originale gelöscht werden dürfen (wie bei Photok)
     val deleter = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { r ->
@@ -309,28 +394,6 @@ fun rememberImport(vault: Vault, targetFid: () -> String?, onDone: (Int) -> Unit
         App.suppressLock = false
         if (uris.isNotEmpty()) run(uris, offerDelete = true)
     }
-    val photo = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
-        App.suppressLock = false
-        val f = pendingCam
-        pendingCam = null
-        if (ok && f != null && f.length() > 0) {
-            run(listOf(fileUri(ctx, f)), listOf(f.name)) { f.delete() }
-        } else f?.delete()
-    }
-    val video = rememberLauncherForActivityResult(ActivityResultContracts.CaptureVideo()) { ok ->
-        App.suppressLock = false
-        val f = pendingCam
-        pendingCam = null
-        if (ok && f != null && f.length() > 0) {
-            run(listOf(fileUri(ctx, f)), listOf(f.name)) { f.delete() }
-        } else f?.delete()
-    }
-
-    fun camFile(prefix: String, ext: String): File {
-        val dir = File(ctx.cacheDir, "cam").apply { mkdirs() }
-        return File(dir, "${prefix}_$stamp.$ext")
-    }
-
     return remember(vault) {
         ImportActions(
             busy = { busy },
@@ -351,28 +414,9 @@ fun rememberImport(vault: Vault, targetFid: () -> String?, onDone: (Int) -> Unit
                     App.suppressLock = false
                 }
             },
-            takePhoto = {
-                val f = camFile("Foto", "jpg")
-                pendingCam = f
-                App.suppressLock = true
-                try {
-                    photo.launch(fileUri(ctx, f))
-                } catch (e: Exception) {
-                    App.suppressLock = false
-                    App.toast("Keine Kamera-App gefunden")
-                }
-            },
-            takeVideo = {
-                val f = camFile("Video", "mp4")
-                pendingCam = f
-                App.suppressLock = true
-                try {
-                    video.launch(fileUri(ctx, f))
-                } catch (e: Exception) {
-                    App.suppressLock = false
-                    App.toast("Keine Kamera-App gefunden")
-                }
-            },
+            // Eigene Kamera: Aufnahmen gehen direkt verschlüsselt in den Ordner
+            takePhoto = { targetFid()?.let { App.nav.push(app.glass.tresor.Screen.Camera(it, false)) } },
+            takeVideo = { targetFid()?.let { App.nav.push(app.glass.tresor.Screen.Camera(it, true)) } },
             pickAudio = {
                 App.suppressLock = true
                 try {

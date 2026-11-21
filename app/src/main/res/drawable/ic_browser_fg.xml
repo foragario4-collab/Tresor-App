@@ -1,0 +1,6 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <!-- Kompass/Globus -->
+    <path android:pathData="M54,54m-20,0a20,20 0,1 0,40 0a20,20 0,1 0,-40 0" android:strokeColor="#FFFFFFFF" android:strokeWidth="3.6" />
+    <path android:pathData="M64,44L57,57L44,64L51,51Z" android:fillColor="#FFFFFFFF" />
+</vector>

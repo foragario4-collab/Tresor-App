@@ -24,7 +24,10 @@ enum class Disguise(val alias: String, val title: String) {
     KALENDER("app.glass.tresor.alias.Kalender", "Kalender"),
     CHECKLISTE("app.glass.tresor.alias.Checkliste", "Checkliste"),
     NEWS("app.glass.tresor.alias.News", "News"),
-    MUSIK("app.glass.tresor.alias.Musik", "Musik");
+    MUSIK("app.glass.tresor.alias.Musik", "Musik"),
+    NOTIZEN("app.glass.tresor.alias.Notizen", "Notizen"),
+    WETTER("app.glass.tresor.alias.Wetter", "Wetter"),
+    BROWSER("app.glass.tresor.alias.Browser", "Browser");
 
     companion object {
         fun fromAlias(cls: String?): Disguise? = entries.firstOrNull { it.alias == cls }
@@ -49,6 +52,9 @@ sealed interface Screen {
     data object ChatTips : Screen
     data object ChatAdd : Screen
     data object Player : Screen
+    data object Handbook : Screen
+    data class CategorySettings(val kind: FolderKind) : Screen
+    data class Camera(val fid: String, val video: Boolean) : Screen
     data class FolderSettings(val fid: String) : Screen
 }
 
@@ -151,6 +157,33 @@ object App {
     var motionLock by mutableStateOf(false)
     /** Empfindlichkeit der Bewegungssperre 0 (nur starkes Rucken) … 1 (sehr empfindlich). */
     var motionSens by mutableStateOf(0.4f)
+    /**
+     * Wann der Tresor sperrt: "now" = sofort beim Verlassen, "screen" = erst wenn der Bildschirm ausgeht,
+     * "1"/"5"/"15" = nach so vielen Minuten im Hintergrund, "close" = erst beim Schließen der App.
+     */
+    var lockMode by mutableStateOf("now")
+    @Volatile
+    var backgroundSince = 0L
+
+    fun changeLockMode(m: String) { lockMode = m; prefs.edit().putString("lockMode", m).apply() }
+
+    fun lockModeLabel(m: String = lockMode) = when (m) {
+        "screen" -> "Wenn der Bildschirm ausgeht"
+        "1" -> "Nach 1 Minute im Hintergrund"
+        "5" -> "Nach 5 Minuten im Hintergrund"
+        "15" -> "Nach 15 Minuten im Hintergrund"
+        "close" -> "Erst beim Schließen der App"
+        else -> "Sofort beim Verlassen"
+    }
+
+    /** Beim Zurückkehren: Ist die eingestellte Zeit im Hintergrund abgelaufen? */
+    fun checkTimedLock() {
+        val since = backgroundSince
+        backgroundSince = 0L
+        val min = lockMode.toIntOrNull() ?: return
+        if (since > 0 && android.os.SystemClock.elapsedRealtime() - since > min * 60_000L) lock()
+    }
+
     /** Sperren, sobald das Handy mit dem Display nach unten liegt. */
     var flipLock by mutableStateOf(false)
     var wipeAfter10 by mutableStateOf(false)
@@ -166,6 +199,9 @@ object App {
         motionLock = prefs.getBoolean("motion", false)
         motionSens = prefs.getFloat("motionSens", 0.4f).coerceIn(0f, 1f)
         flipLock = prefs.getBoolean("flipLock", false)
+        lockMode = prefs.getString("lockMode", "now") ?: "now"
+        appHidden = prefs.getBoolean("appHidden", false)
+        app.glass.tresor.browser.BrowserTor.init()
         wipeAfter10 = prefs.getBoolean("wipe10", false)
         disguise = Disguise.entries.firstOrNull { it.name == prefs.getString("disguiseName", null) } ?: Disguise.TRESOR
         clearShareCache(force = true)
@@ -218,6 +254,16 @@ object App {
             nav.openVault()
             return true
         }
+        // Löschcode eines einzelnen Tresors
+        val target = withContext(Dispatchers.Default) {
+            vaultPanicTarget(chars)?.also { panicWipeVault(it, chars) }
+        }
+        if (target != null) {
+            Crypto.wipe(chars)
+            vault = target
+            nav.openVault()
+            return true
+        }
         if (lockoutRemainingMs() > 0) {
             Crypto.wipe(chars)
             return false
@@ -259,18 +305,40 @@ object App {
         val inChat = nav.stack.any {
             it == Screen.Chat || it is Screen.ChatThread || it == Screen.ChatCode || it == Screen.ChatAdd || it == Screen.ChatTips
         }
+        val inBrowser = nav.stack.any { it == Screen.Browser }
         val isChat = { f: app.glass.tresor.vault.Folder -> f.kind == app.glass.tresor.vault.FolderKind.CHAT }
-        if (!inAlbums) v.hideRevealed { !isChat(it) }
+        val isBrowser = { f: app.glass.tresor.vault.Folder -> f.kind == app.glass.tresor.vault.FolderKind.BROWSER }
+        if (!inAlbums) v.hideRevealed { !isChat(it) && !isBrowser(it) }
+        if (!inBrowser) {
+            v.hideRevealed { isBrowser(it) }
+            app.glass.tresor.browser.BrowserAreas.reset()
+        }
         if (!inChat) {
             v.hideRevealed { isChat(it) }
             app.glass.tresor.chat.ChatAccounts.reset()
         }
         val keep = v.revealed.toMutableSet()
         if (inChat) keep += app.glass.tresor.chat.ChatAccounts.selected
+        if (inBrowser) app.glass.tresor.browser.BrowserAreas.selected?.let { keep += it }
         v.folders.toList()
             .filter { it.isProtected && it.relock && it.id !in used && it.id !in keep && v.isFolderUnlocked(it.id) }
             .forEach { v.relockFolder(it.id) }
         app.glass.tresor.chat.ChatEngine.prune(v)
+        // Geschützte Container schließen, sobald man ihre Kategorie verlässt
+        val kindsInUse = nav.stack.mapNotNull { sc ->
+            when (sc) {
+                is Screen.Albums -> sc.kind
+                is Screen.CategorySettings -> sc.kind
+                is Screen.FolderView -> v.folder(sc.fid)?.kind
+                is Screen.Viewer -> v.folder(sc.fid)?.kind
+                is Screen.TextView -> v.folder(sc.fid)?.kind
+                is Screen.NoteEdit -> v.folder(sc.fid)?.kind
+                is Screen.FolderSettings -> v.folder(sc.fid)?.kind
+                Screen.Player -> app.glass.tresor.music.MusicPlayer.current?.first?.let { v.folder(it)?.kind }
+                else -> null
+            }
+        }.toSet() + listOfNotNull(app.glass.tresor.music.MusicPlayer.current?.first?.let { v.folder(it)?.kind })
+        v.openCategories.toList().filter { it !in kindsInUse }.forEach { v.relockCategory(it) }
     }
 
     fun onBioUnlocked(v: Vault) {
@@ -296,6 +364,9 @@ object App {
         app.glass.tresor.chat.Calls.onVaultLocked()
         app.glass.tresor.music.MusicPlayer.onVaultLocked()
         app.glass.tresor.chat.ChatAccounts.reset()
+        app.glass.tresor.browser.BrowserAreas.reset()
+        // Tor-Weiterleitung des Browsers aufheben (startet beim nächsten Öffnen neu)
+        if (app.glass.tresor.browser.BrowserTor.ready || app.glass.tresor.chat.ChatService.forBrowser) app.glass.tresor.browser.BrowserTor.release()
         app.glass.tresor.chat.VoicePlayer.stop()
         app.glass.tresor.chat.ChatEngine.close()
         vaults.forEach { it.lock() }
@@ -333,6 +404,59 @@ object App {
         prefs.edit().remove("panic").apply()
     }
 
+    // ── Löschcode pro Tresor: löscht nur diesen einen Tresor, die anderen bleiben ──
+    private fun vaultPanicKey(slot: String) = "panic_$slot"
+    fun vaultPanicEnabled(v: Vault) = prefs.contains(vaultPanicKey(v.slot))
+
+    fun setVaultPanicCode(v: Vault, code: CharArray) {
+        val salt = Crypto.random(16)
+        val hash = Crypto.deriveKey(code, salt)
+        prefs.edit().putString(vaultPanicKey(v.slot), Crypto.b64(salt) + ":" + Crypto.b64(hash)).apply()
+        Crypto.wipe(hash)
+    }
+
+    fun removeVaultPanicCode(v: Vault) {
+        prefs.edit().remove(vaultPanicKey(v.slot)).apply()
+    }
+
+    private fun removeAllVaultPanicCodes() {
+        val e = prefs.edit()
+        prefs.all.keys.filter { it.startsWith("panic_") }.forEach { e.remove(it) }
+        e.apply()
+    }
+
+    private fun matchesHash(stored: String?, code: CharArray): Boolean {
+        if (stored == null) return false
+        return try {
+            val (s, h) = stored.split(":")
+            val test = Crypto.deriveKey(code, Crypto.unb64(s))
+            java.security.MessageDigest.isEqual(test, Crypto.unb64(h)).also { Crypto.wipe(test) }
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /** Zu welchem Tresor gehört dieser Löschcode? null = keiner. */
+    fun vaultPanicTarget(code: CharArray): Vault? =
+        vaults.toList().firstOrNull { it.exists() && matchesHash(prefs.getString(vaultPanicKey(it.slot), null), code) }
+
+    fun isAnyPanicCode(code: CharArray) = isPanicCode(code) || vaultPanicTarget(code) != null
+
+    /**
+     * Löscht nur diesen einen Tresor (Schlüssel zuerst → sofort unlesbar) und legt an seiner Stelle
+     * einen leeren Tresor mit dem Löschcode an. Die anderen Tresore bleiben unberührt.
+     */
+    fun panicWipeVault(v: Vault, code: CharArray) {
+        app.glass.tresor.music.MusicPlayer.stop()
+        app.glass.tresor.chat.ChatEngine.forget(v.slot)
+        ThumbCache.clearSlot(v.slot)
+        v.wipeAll()
+        removeVaultPanicCode(v)
+        if (prefs.getString("bioSlot", null) == v.slot) prefs.edit().remove("bioSlot").apply()
+        prefs.edit().putInt("failed", 0).putLong("lockout", 0L).apply()
+        v.create(code)
+    }
+
     fun isPanicCode(code: CharArray): Boolean {
         val v = prefs.getString("panic", null) ?: return false
         return try {
@@ -358,6 +482,7 @@ object App {
         genuine = checkSignature()
         loadVaults()
         removePanicCode()
+        removeAllVaultPanicCodes()
         prefs.edit().remove("wipe10").putInt("failed", 0).putLong("lockout", 0L).apply()
         wipeAfter10 = false
         vaultA.create(code)
@@ -391,6 +516,7 @@ object App {
         genuine = checkSignature()
         loadVaults()
         removePanicCode()
+        removeAllVaultPanicCodes()
         ThumbCache.clearAll()
         clearShareCache(force = true)
         prefs.edit().putInt("failed", 0).putLong("lockout", 0L).apply()
@@ -402,7 +528,7 @@ object App {
 
     /** Prüft, ob ein Code schon zu irgendeinem Tresor oder zum Löschcode gehört. */
     fun codeInUse(code: CharArray): Boolean =
-        isPanicCode(code) || vaults.any { it.exists() && it.verifyPin(code) }
+        isAnyPanicCode(code) || vaults.any { it.exists() && it.verifyPin(code) }
 
     /** Legt einen neuen, unabhängigen Tresor an. Gibt null zurück, wenn der Code schon vergeben ist. */
     fun createVault(code: CharArray): Vault? {
@@ -420,13 +546,50 @@ object App {
         val v = vault ?: return
         if (v === vaultA) return
         app.glass.tresor.chat.ChatEngine.forget(v.slot)
+        removeVaultPanicCode(v)
         v.wipeAll()
         vaults.remove(v)
         vault = null
         nav.reset(Screen.Disguise, fwd = false)
     }
 
+    /** App komplett ohne Symbol – nur über den (selbst gewählten) Telefoncode *#*#ZAHL#*#* zu öffnen. */
+    var appHidden by mutableStateOf(false)
+
+    fun changeAppHidden(h: Boolean) {
+        appHidden = h
+        prefs.edit().putBoolean("appHidden", h).apply()
+        if (h) {
+            val pm = ctx.packageManager
+            Disguise.entries.forEach {
+                pm.setComponentEnabledSetting(
+                    ComponentName(ctx.packageName, it.alias),
+                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED, PackageManager.DONT_KILL_APP
+                )
+            }
+            setWeatherWidget(false)
+        } else applyDisguise(disguise)
+    }
+
+    /** Wetter-Widget nur anbieten, solange die Tarnung „Wetter“ sichtbar ist. */
+    private fun setWeatherWidget(on: Boolean) {
+        try {
+            ctx.packageManager.setComponentEnabledSetting(
+                ComponentName(ctx, app.glass.tresor.disguise.WeatherWidget::class.java),
+                if (on) PackageManager.COMPONENT_ENABLED_STATE_ENABLED else PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                PackageManager.DONT_KILL_APP
+            )
+        } catch (_: Exception) {
+        }
+    }
+
     fun applyDisguise(d: Disguise) {
+        if (appHidden) {
+            // Versteckt: nur merken, welche Tarnung beim Öffnen erscheint – kein Symbol aktivieren
+            disguise = d
+            prefs.edit().putString("disguiseName", d.name).apply()
+            return
+        }
         val pm = ctx.packageManager
         // Neues Icon zuerst aktivieren, dann die anderen ausblenden
         pm.setComponentEnabledSetting(
@@ -439,6 +602,7 @@ object App {
                 PackageManager.COMPONENT_ENABLED_STATE_DISABLED, PackageManager.DONT_KILL_APP
             )
         }
+        setWeatherWidget(d == Disguise.WETTER)
         disguise = d
         prefs.edit().putString("disguiseName", d.name).apply()
     }

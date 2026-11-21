@@ -107,6 +107,16 @@ dependencies {
     implementation("androidx.media3:media3-ui:1.5.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 
+    // Eigene Kamera (Fotos/Videos gehen direkt verschlüsselt in den Tresor)
+    val camerax = "1.4.0"
+    implementation("androidx.camera:camera-core:$camerax")
+    implementation("androidx.camera:camera-camera2:$camerax")
+    implementation("androidx.camera:camera-lifecycle:$camerax")
+    implementation("androidx.camera:camera-video:$camerax")
+    implementation("androidx.camera:camera-view:$camerax")
+    // Browser: Tor-Weiterleitung (Proxy) und Skripte vor dem Laden
+    implementation("androidx.webkit:webkit:1.12.1")
+
     // Chat: Tor (Onion-Dienste), Schlüsselaustausch X25519, QR-Codes
     implementation("info.guardianproject:tor-android:0.4.8.16")
     implementation("info.guardianproject:jtorctl:0.4.5.7")

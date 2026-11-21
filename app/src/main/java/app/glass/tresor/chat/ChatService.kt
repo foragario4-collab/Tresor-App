@@ -56,6 +56,27 @@ class ChatService : Service() {
         @Volatile
         var socksPort: Int = -1
 
+        /** Tor auch ohne Chat laufen lassen (Browser im Tor-Modus). */
+        @Volatile
+        var forBrowser = false
+
+        @Volatile
+        private var instance: ChatService? = null
+
+        /** Tor-Steuerung: aktuelle Wege (Circuits) – für die Anzeige der Knoten. */
+        fun torInfo(key: String): String? = try {
+            instance?.tor?.torControlConnection?.getInfo(key)
+        } catch (e: Exception) {
+            null
+        }
+
+        /** Neue Tor-Wege anfordern (neue Identität im Browser). */
+        fun newIdentity(): Boolean = try {
+            instance?.tor?.torControlConnection?.signal("NEWNYM"); true
+        } catch (e: Exception) {
+            false
+        }
+
         fun start(ctx: Context) {
             try {
                 ContextCompat.startForegroundService(ctx, Intent(ctx, ChatService::class.java))
@@ -127,6 +148,7 @@ class ChatService : Service() {
         val type = if (Build.VERSION.SDK_INT >= 34) ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE else 0
         ServiceCompat.startForeground(this, ID_FG, n, type)
         running = true
+        instance = this
         state = "Verbindet …"
         exec.execute { startTor() }
         loop = Thread { runLoop() }.apply { isDaemon = true; start() }
@@ -142,6 +164,7 @@ class ChatService : Service() {
 
     override fun onDestroy() {
         running = false
+        instance = null
         state = "Aus"
         socksPort = -1
         wake()
@@ -163,7 +186,7 @@ class ChatService : Service() {
     @Synchronized
     private fun startTor() {
         val reg = ChatSpool.registry(this)
-        if (reg.isEmpty()) {
+        if (reg.isEmpty() && !forBrowser) {
             stopSelf(); return
         }
         // Onion-Dienste in die Tor-Konfiguration schreiben (eine Adresse pro Tresor)

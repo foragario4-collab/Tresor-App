@@ -137,13 +137,13 @@ private fun SyncLoop(engine: ChatEngine, onStatus: (String) -> Unit = {}) {
 }
 
 @Composable
-private fun StatusPill(state: String) {
+private fun StatusPill(state: String, onClick: () -> Unit = {}) {
     val color = when (state) {
         "Bereit" -> G.green
         "Aus" -> G.red
         else -> Color(0xFFFFB020)
     }
-    Row(Modifier.glass(Pill).padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.pressable(Pill) { onClick() }.glass(Pill).padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(8.dp).clip(CircleShape).background(color))
         Spacer(Modifier.width(6.dp))
         Text(if (state == "Bereit") "Tor verbunden" else if (state == "Aus") "Offline" else "Verbindet …", style = G.footnote.copy(color = Color.White))
@@ -167,6 +167,7 @@ fun ChatListScreen() {
     var newName by remember { mutableStateOf("") }
     var unlockAcc by remember { mutableStateOf<Folder?>(null) }
     var confirmDelAcc by remember { mutableStateOf(false) }
+    var torSheet by remember { mutableStateOf(false) }
 
     val notifPerm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { App.suppressLock = false }
 
@@ -181,7 +182,7 @@ fun ChatListScreen() {
                     notifPerm.launch(Manifest.permission.POST_NOTIFICATIONS)
                 }
             }
-        } else ChatListContent(engine, status, onRequest = { request = it }, onAccounts = { accountsSheet = true }) {
+        } else ChatListContent(engine, status, onRequest = { request = it }, onAccounts = { accountsSheet = true }, onStatus = { torSheet = true }) {
             view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
             codeSheet = true
         }
@@ -245,6 +246,8 @@ fun ChatListScreen() {
             }
         }
 
+        TorRelaySheet(torSheet) { torSheet = false }
+
         Sheet(request != null, { request = null }) {
             val c = request ?: return@Sheet
             SheetHeader(Ic.person, "„${c.name}“ möchte mit dir schreiben", "Nimm nur Anfragen von Personen an, denen du deinen Code selbst gegeben hast.")
@@ -255,6 +258,60 @@ fun ChatListScreen() {
             Spacer(Modifier.height(10.dp))
             PillButton("Ablehnen", textColor = G.red, modifier = Modifier.fillMaxWidth()) { engine.removeContact(c); request = null }
         }
+    }
+}
+
+/** Tippen auf „Tor verbunden“: über welche Knoten die Verbindungen gerade laufen. */
+@Composable
+private fun androidx.compose.foundation.layout.BoxScope.TorRelaySheet(visible: Boolean, onDismiss: () -> Unit) {
+    var circuits by remember { mutableStateOf<List<app.glass.tresor.chat.TorRelays.Circuit>?>(null) }
+    var refresh by remember { mutableStateOf(0) }
+    LaunchedEffect(visible, refresh) {
+        if (!visible) return@LaunchedEffect
+        circuits = null
+        circuits = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            try { app.glass.tresor.chat.TorRelays.circuits { ChatService.torInfo(it) } } catch (e: Exception) { emptyList() }
+        }
+    }
+    Sheet(visible, onDismiss) {
+        SheetHeader(Ic.globe, "Tor-Verbindung", "Jede Verbindung läuft über drei Knoten in verschiedenen Ländern. Keiner kennt gleichzeitig dich und dein Ziel.")
+        val list = circuits
+        Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            when {
+                list == null -> Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                    androidx.compose.material3.CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(22.dp))
+                }
+                list.isEmpty() -> Text("Gerade keine fertigen Wege. Tor baut sie im Hintergrund auf – gleich nochmal versuchen.", style = G.callout.copy(color = G.dim))
+                else -> list.forEach { c ->
+                    Column(Modifier.fillMaxWidth().glass(sq(18)).padding(14.dp)) {
+                        Text(app.glass.tresor.chat.TorRelays.purposeLabel(c.purpose), style = G.headline.copy(fontSize = 15.sp))
+                        Spacer(Modifier.height(6.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("📱 Du", style = G.footnote.copy(color = Color.White))
+                        }
+                        c.relays.forEachIndexed { i, r ->
+                            Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text(app.glass.tresor.chat.TorRelays.flag(r.country), fontSize = 20.sp)
+                                Spacer(Modifier.width(10.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(
+                                        app.glass.tresor.chat.TorRelays.countryName(r.country) + " · " + r.nick,
+                                        style = G.callout.copy(color = Color.White), maxLines = 1, overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        app.glass.tresor.chat.TorRelays.roleLabel(i, c.relays.size, c.purpose) + (r.ip?.let { " · $it" } ?: ""),
+                                        style = G.footnote, maxLines = 1
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        PillButton("Aktualisieren", icon = Ic.refresh, modifier = Modifier.fillMaxWidth()) { refresh++ }
+        Spacer(Modifier.navigationBarsPadding())
     }
 }
 
@@ -279,6 +336,7 @@ private fun androidx.compose.foundation.layout.BoxScope.ChatListContent(
     status: String,
     onRequest: (Contact) -> Unit,
     onAccounts: () -> Unit,
+    onStatus: () -> Unit,
     onTitleLong: () -> Unit
 ) {
         val requests = engine.contacts.filter { !it.accepted }
@@ -292,7 +350,6 @@ private fun androidx.compose.foundation.layout.BoxScope.ChatListContent(
             item {
                 TopBar(onBack = { App.nav.pop() }, horizontalPadding = 0.dp) {
                     GlassIconButton(Ic.info, "Tipps") { App.nav.push(Screen.ChatTips) }
-                    GlassIconButton(Ic.qr, "Mein Code") { App.nav.push(Screen.ChatCode) }
                 }
                 Spacer(Modifier.height(14.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -304,12 +361,14 @@ private fun androidx.compose.foundation.layout.BoxScope.ChatListContent(
                             indication = null, onClick = {}, onLongClick = onTitleLong
                         )
                     )
-                    StatusPill(status)
+                    StatusPill(status, onStatus)
                 }
                 Text("Direkt von Handy zu Handy über Tor · Ende-zu-Ende verschlüsselt", style = G.footnote)
                 Spacer(Modifier.height(10.dp))
                 AccountPill(engine.accountName, engine.myName, onAccounts)
                 Spacer(Modifier.height(10.dp))
+                TipCard("chat", "Gut zu wissen", "Tippe auf „Tor verbunden“, um die Knoten zu sehen. Unten „Kontakt hinzufügen“ lange drücken öffnet versteckte Konten.")
+                Spacer(Modifier.height(4.dp))
             }
             if (requests.isNotEmpty()) {
                 item { SectionLabel("Kontaktanfragen") }
@@ -365,7 +424,16 @@ private fun androidx.compose.foundation.layout.BoxScope.ChatListContent(
                 .height(56.dp).glass(Pill, G.fillStrong).padding(horizontal = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            PillButton("Kontakt hinzufügen", icon = Ic.plus, height = 44.dp) { App.nav.push(Screen.ChatAdd) }
+            // Lange drücken: Code für versteckte Konten (mit dem Daumen erreichbar)
+            Row(
+                Modifier.height(44.dp).pressable(Pill, onLongClick = onTitleLong) { App.nav.push(Screen.ChatAdd) }
+                    .padding(horizontal = 18.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Ic.plus, null, tint = Color.White, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Kontakt hinzufügen", style = G.callout.copy(color = Color.White, fontWeight = FontWeight.SemiBold))
+            }
         }
 }
 
@@ -399,7 +467,8 @@ private fun handleAdd(engine: ChatEngine, code: String): Boolean {
 
 @Composable
 private fun ChatSetup(name: String, onName: (String) -> Unit, account: String, onAccounts: () -> Unit, onStart: () -> Unit) {
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
+    // imePadding: Die Tastatur schiebt den Inhalt hoch, statt das Namensfeld zu verdecken
+    Column(Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
         TopBar(onBack = { App.nav.pop() }, horizontalPadding = 0.dp)
         Spacer(Modifier.height(14.dp))
         Text("Privater Chat", style = G.largeTitle)
@@ -945,7 +1014,7 @@ fun ChatAddScreen() {
 
     GlassBackground {
         Column(
-            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
+            Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             TopBar(onBack = { App.nav.pop() }, horizontalPadding = 0.dp)
@@ -1003,6 +1072,31 @@ fun ChatAddScreen() {
                         }
                     }
                 }
+            }
+            // Code als Text zum Kopieren und Weitergeben (z. B. über einen anderen Messenger)
+            if (code != null) {
+                Spacer(Modifier.height(18.dp))
+                Text("DEIN CODE ALS TEXT", style = G.caption, modifier = Modifier.fillMaxWidth())
+                Spacer(Modifier.height(8.dp))
+                Column(
+                    Modifier.fillMaxWidth().pressable(sq(18)) {
+                        val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        cm.setPrimaryClip(ClipData.newPlainText("Tresor-Code", code))
+                        App.toast("Code kopiert")
+                    }.glass(sq(18)).padding(14.dp)
+                ) {
+                    Text(code, style = G.footnote.copy(color = Color.White, fontFamily = FontFamily.Monospace, fontSize = 12.sp), maxLines = 4, overflow = TextOverflow.Ellipsis)
+                    Spacer(Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Ic.copy, null, tint = G.accentText, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Tippen zum Kopieren", style = G.footnote.copy(color = G.accentText))
+                    }
+                }
+                Text(
+                    "Den Text kann der andere unten bei „Code einfügen“ eintragen. Am sichersten ist trotzdem das gegenseitige Scannen.",
+                    style = G.footnote.copy(color = G.faint), modifier = Modifier.fillMaxWidth().padding(top = 6.dp, start = 4.dp)
+                )
             }
             Spacer(Modifier.height(18.dp))
 
@@ -1082,7 +1176,7 @@ fun ChatCodeScreen() {
 
     GlassBackground {
         Column(
-            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
+            Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             TopBar(onBack = { App.nav.pop() }, horizontalPadding = 0.dp)
@@ -1129,7 +1223,7 @@ fun ChatTipsScreen() {
     var bg by remember { mutableStateOf(App.prefs.getBoolean("chatBackground", true)) }
     var notify by remember { mutableStateOf(App.prefs.getBoolean("chatNotify", true)) }
     GlassBackground {
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
+        Column(Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
             TopBar(onBack = { App.nav.pop() }, horizontalPadding = 0.dp)
             Spacer(Modifier.height(14.dp))
             Text("So funktioniert der Chat", style = G.largeTitle.copy(fontSize = 30.sp))

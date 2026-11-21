@@ -83,6 +83,13 @@ fun HomeScreen() {
         .sumOf { f -> vault.itemsOf(f.id).count { type == null || it.type == type } }
 
     val defaultMedia = visible.firstOrNull { it.kind == FolderKind.MEDIA && !it.isProtected }?.id
+    var unlockCat by remember { mutableStateOf<Pair<FolderKind, Screen>?>(null) }
+    // Kategorie öffnen: geschützter Container → erst entsperren
+    fun openCat(kind: FolderKind, target: Screen) {
+        if (vault.isCategoryOpen(kind)) App.nav.push(target) else unlockCat = kind to target
+    }
+    fun locked(kind: FolderKind) = !vault.isCategoryOpen(kind)
+    fun catSettings(kind: FolderKind) = openCat(kind, Screen.CategorySettings(kind))
     val import = rememberImport(vault, { defaultMedia })
 
     GlassBackground {
@@ -108,30 +115,31 @@ fun HomeScreen() {
             }
 
             SearchField(query) { query = it }
+            TipCard("home", "Willkommen im Tresor", "Kategorie lange drücken = eigener Schlüssel (PIN, Passwort, Fingerabdruck/Gesicht). Alles weitere erklärt das Handbuch in den Einstellungen.")
 
             if (query.isNotBlank()) {
                 SearchResults(vault, query)
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        CategoryCard(Modifier.weight(1f), Ic.photo, G.blue, "Fotos", count(FolderKind.MEDIA, ItemType.IMAGE)) {
-                            App.nav.push(Screen.Albums(FolderKind.MEDIA, ItemType.IMAGE))
+                        CategoryCard(Modifier.weight(1f), Ic.photo, G.blue, "Fotos", count(FolderKind.MEDIA, ItemType.IMAGE), locked(FolderKind.MEDIA), { catSettings(FolderKind.MEDIA) }) {
+                            openCat(FolderKind.MEDIA, Screen.Albums(FolderKind.MEDIA, ItemType.IMAGE))
                         }
-                        CategoryCard(Modifier.weight(1f), Ic.video, G.purple, "Videos", count(FolderKind.MEDIA, ItemType.VIDEO)) {
-                            App.nav.push(Screen.Albums(FolderKind.MEDIA, ItemType.VIDEO))
-                        }
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        CategoryCard(Modifier.weight(1f), Ic.folder, G.amber, "Dateien", count(FolderKind.FILES, null)) {
-                            App.nav.push(Screen.Albums(FolderKind.FILES, null))
-                        }
-                        CategoryCard(Modifier.weight(1f), Ic.note, G.teal, "Notizen", count(FolderKind.NOTES, null)) {
-                            App.nav.push(Screen.Albums(FolderKind.NOTES, null))
+                        CategoryCard(Modifier.weight(1f), Ic.video, G.purple, "Videos", count(FolderKind.MEDIA, ItemType.VIDEO), locked(FolderKind.MEDIA), { catSettings(FolderKind.MEDIA) }) {
+                            openCat(FolderKind.MEDIA, Screen.Albums(FolderKind.MEDIA, ItemType.VIDEO))
                         }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        CategoryCard(Modifier.weight(1f), Ic.music, Color(0xFFE5484D), "Musik", count(FolderKind.MUSIC, null)) {
-                            App.nav.push(Screen.Albums(FolderKind.MUSIC, null))
+                        CategoryCard(Modifier.weight(1f), Ic.folder, G.amber, "Dateien", count(FolderKind.FILES, null), locked(FolderKind.FILES), { catSettings(FolderKind.FILES) }) {
+                            openCat(FolderKind.FILES, Screen.Albums(FolderKind.FILES, null))
+                        }
+                        CategoryCard(Modifier.weight(1f), Ic.note, G.teal, "Notizen", count(FolderKind.NOTES, null), locked(FolderKind.NOTES), { catSettings(FolderKind.NOTES) }) {
+                            openCat(FolderKind.NOTES, Screen.Albums(FolderKind.NOTES, null))
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        CategoryCard(Modifier.weight(1f), Ic.music, Color(0xFFE5484D), "Musik", count(FolderKind.MUSIC, null), locked(FolderKind.MUSIC), { catSettings(FolderKind.MUSIC) }) {
+                            openCat(FolderKind.MUSIC, Screen.Albums(FolderKind.MUSIC, null))
                         }
                         ToolCard(Modifier.weight(1f), Ic.chat, Color(0xFF30A46C), "Chat", "Über Tor") {
                             App.nav.push(Screen.Chat)
@@ -185,6 +193,12 @@ fun HomeScreen() {
 
         BusyBanner(import.busy(), Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 8.dp))
 
+        CategoryUnlockSheet(vault, unlockCat?.first, { unlockCat = null }) {
+            val t = unlockCat?.second
+            unlockCat = null
+            if (t != null) App.nav.push(t)
+        }
+
         // Untere Leiste
         Row(
             Modifier
@@ -236,18 +250,25 @@ private fun NavTab(icon: ImageVector, label: String, active: Boolean, onClick: (
 }
 
 @Composable
-private fun CategoryCard(modifier: Modifier, icon: ImageVector, color: Color, title: String, count: Int, onClick: () -> Unit) {
+private fun CategoryCard(
+    modifier: Modifier, icon: ImageVector, color: Color, title: String, count: Int,
+    locked: Boolean = false, onLong: (() -> Unit)? = null, onClick: () -> Unit
+) {
     Column(
         modifier
-            .pressable(sq(24), onClick = onClick)
+            .pressable(sq(24), onLongClick = onLong, onClick = onClick)
             .glass(sq(24))
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        AppTile(icon, color)
+        Row(verticalAlignment = Alignment.Top) {
+            AppTile(icon, color)
+            Spacer(Modifier.weight(1f))
+            if (locked) Icon(Ic.lock, "Geschützt", tint = G.dim, modifier = Modifier.size(16.dp))
+        }
         Column {
             Text(title, style = G.headline)
-            Text(if (count == 1) "1 Element" else "$count Elemente", style = G.footnote)
+            Text(if (locked) "Geschützt" else if (count == 1) "1 Element" else "$count Elemente", style = G.footnote)
         }
     }
 }

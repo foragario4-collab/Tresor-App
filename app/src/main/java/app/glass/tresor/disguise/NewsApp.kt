@@ -70,7 +70,7 @@ private val newsBlobs = listOf(
 )
 
 private data class Feed(val name: String, val url: String)
-private data class Article(val title: String, val link: String, val text: String, val date: Date?, val source: String)
+private data class Article(val title: String, val link: String, val text: String, val date: Date?, val source: String, val image: String? = null)
 
 private val feeds = listOf(
     Feed("ORF", "https://rss.orf.at/news.xml"),
@@ -95,18 +95,28 @@ private fun fetch(feed: Feed): List<Article> {
             p.setInput(input, null)
             val out = mutableListOf<Article>()
             var inItem = false
-            var title = ""; var link = ""; var desc = ""; var date = ""
+            var title = ""; var link = ""; var desc = ""; var date = ""; var img = ""
             var ev = p.eventType
             while (ev != XmlPullParser.END_DOCUMENT) {
                 when (ev) {
                     XmlPullParser.START_TAG -> when (p.name) {
-                        "item", "entry" -> { inItem = true; title = ""; link = ""; desc = ""; date = "" }
+                        "item", "entry" -> { inItem = true; title = ""; link = ""; desc = ""; date = ""; img = "" }
+                        // Bilder: media:content / media:thumbnail / enclosure
+                        "media:content", "media:thumbnail", "enclosure" -> if (inItem && img.isEmpty()) {
+                            val u = p.getAttributeValue(null, "url") ?: ""
+                            val type = p.getAttributeValue(null, "type") ?: p.getAttributeValue(null, "medium") ?: "image"
+                            if (u.isNotEmpty() && type.startsWith("image")) img = u
+                        }
                         "title" -> if (inItem) title = p.nextText()
                         "link" -> if (inItem) {
                             val href = p.getAttributeValue(null, "href")
                             link = href ?: p.nextText()
                         }
-                        "description", "summary", "content:encoded" -> if (inItem && desc.isEmpty()) desc = p.nextText()
+                        "description", "summary", "content:encoded", "content" -> if (inItem) {
+                            val t = p.nextText()
+                            if (img.isEmpty()) imgRegex.find(t)?.let { img = it.groupValues[1] }
+                            if (desc.isEmpty()) desc = t
+                        }
                         "pubDate", "dc:date", "updated", "published" -> if (inItem && date.isEmpty()) date = p.nextText()
                     }
                     XmlPullParser.END_TAG -> if (p.name == "item" || p.name == "entry") {
@@ -115,7 +125,8 @@ private fun fetch(feed: Feed): List<Article> {
                             out += Article(
                                 title.trim(), link.trim(),
                                 HtmlCompat.fromHtml(desc, HtmlCompat.FROM_HTML_MODE_LEGACY).toString().replace('￼', ' ').trim(),
-                                parseDate(date.trim()), feed.name
+                                parseDate(date.trim()), feed.name,
+                                img.trim().replace("&amp;", "&").replace("http://", "https://").takeIf { it.startsWith("https://") }
                             )
                         }
                     }
@@ -128,6 +139,8 @@ private fun fetch(feed: Feed): List<Article> {
         c.disconnect()
     }
 }
+
+private val imgRegex = Regex("<img[^>]+src=[\"']([^\"']+)[\"']", RegexOption.IGNORE_CASE)
 
 private fun parseDate(s: String): Date? {
     if (s.isEmpty()) return null
@@ -225,14 +238,18 @@ fun NewsApp() {
                 }
                 else -> items(list, key = { it.link + it.title }) { a ->
                     Column(
-                        Modifier.fillMaxWidth().pressable(sq(22)) { open = a }.glass(sq(22)).padding(16.dp)
+                        Modifier.fillMaxWidth().pressable(sq(22)) { open = a }.glass(sq(22))
                     ) {
+                        val img = a.image
+                        if (img != null) NetImage(img, Modifier.fillMaxWidth().height(180.dp).clip(sq(22)))
+                        Column(Modifier.padding(16.dp)) {
                         Text("${a.source} · ${ago(a.date)}".trimEnd(' ', '·'), style = G.caption)
                         Spacer(Modifier.height(4.dp))
                         Text(a.title, style = G.headline.copy(fontSize = 17.sp, lineHeight = 22.sp), maxLines = 3, overflow = TextOverflow.Ellipsis)
                         if (a.text.isNotBlank()) {
                             Spacer(Modifier.height(4.dp))
                             Text(a.text, style = G.footnote, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        }
                         }
                     }
                 }
@@ -241,6 +258,7 @@ fun NewsApp() {
 
         Sheet(open != null, { open = null }) {
             val a = open ?: return@Sheet
+            a.image?.let { NetImage(it, Modifier.fillMaxWidth().height(200.dp).clip(sq(18))); Spacer(Modifier.height(12.dp)) }
             Text("${a.source} · ${ago(a.date)}".trimEnd(' ', '·'), style = G.caption)
             Spacer(Modifier.height(6.dp))
             Text(a.title, style = G.title3)

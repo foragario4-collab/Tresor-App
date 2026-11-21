@@ -14,6 +14,9 @@ fun DisguiseRoot() {
         Disguise.CHECKLISTE -> ChecklistApp()
         Disguise.NEWS -> NewsApp()
         Disguise.MUSIK -> MusicApp()
+        Disguise.NOTIZEN -> NotesApp()
+        Disguise.WETTER -> WeatherApp()
+        Disguise.BROWSER -> app.glass.tresor.ui.screens.BrowserScreen(disguise = true)
     }
 }
 

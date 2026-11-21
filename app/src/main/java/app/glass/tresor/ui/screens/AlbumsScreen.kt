@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -112,6 +114,13 @@ fun AlbumsScreen(kind: FolderKind, filter: ItemType?) {
     // Ausgeblendete Ordner sind unsichtbar, bis ihr Code (oder der Fingerabdruck) sie hervorholt
     val protectedF = all.filter { if (it.hidden) it.id in vault.revealed else it.isProtected }
 
+    /** Geöffneten (oder hervorgeholten) Ordner sofort wieder sperren bzw. verstecken. */
+    fun lockNow(f: Folder) {
+        vault.revealed.remove(f.id)
+        vault.relockFolder(f.id)
+        App.toast(if (f.hidden) "Wieder versteckt" else "Wieder gesperrt")
+    }
+
     fun open(f: Folder, settings: Boolean) {
         if (vault.isFolderUnlocked(f.id)) {
             App.nav.push(if (settings) Screen.FolderSettings(f.id) else Screen.FolderView(f.id, filter))
@@ -122,15 +131,13 @@ fun AlbumsScreen(kind: FolderKind, filter: ItemType?) {
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 0.dp, bottom = 40.dp),
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 0.dp, bottom = 130.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item(span = { GridItemSpan(2) }) {
                 Column {
-                    TopBar(onBack = { App.nav.pop() }, horizontalPadding = 0.dp) {
-                        PillButton("Neuer Ordner", icon = Ic.plus, height = 44.dp) { newFolder = true }
-                    }
+                    TopBar(onBack = { App.nav.pop() }, horizontalPadding = 0.dp)
                     Spacer(Modifier.height(14.dp))
                     // Lange auf den Titel drücken: Code oder Fingerabdruck für versteckte Ordner
                     Text(
@@ -146,6 +153,10 @@ fun AlbumsScreen(kind: FolderKind, filter: ItemType?) {
                             }
                         )
                     )
+                    if (kind != FolderKind.BROWSER && kind != FolderKind.CHAT) {
+                        Spacer(Modifier.height(10.dp))
+                        TipCard("albums", "Versteckte Ordner", "Unten „Neuer Ordner“ lange drücken und den Code eingeben – so holst du versteckte Ordner hervor. Das Schloss am Ordner versteckt ihn sofort wieder.")
+                    }
                 }
             }
             items(normal, key = { it.id }) { f -> FolderCard(vault, f, filter, onLong = { open(f, true) }) { open(f, false) } }
@@ -156,7 +167,7 @@ fun AlbumsScreen(kind: FolderKind, filter: ItemType?) {
                 }
                 items(protectedF, key = { it.id }) { f ->
                     Box(Modifier.animateItem()) {
-                        FolderCard(vault, f, filter, onLong = { open(f, true) }) { open(f, false) }
+                        FolderCard(vault, f, filter, onLong = { open(f, true) }, onLockNow = { lockNow(f) }) { open(f, false) }
                     }
                 }
             }
@@ -167,11 +178,27 @@ fun AlbumsScreen(kind: FolderKind, filter: ItemType?) {
             }
             item(span = { GridItemSpan(2) }) {
                 Text(
-                    "Ordner lange drücken für Schutz und Einstellungen.",
+                    "Ordner lange drücken für Schutz und Einstellungen. Schloss antippen sperrt sofort wieder.",
                     style = G.footnote.copy(color = G.faint),
                     modifier = Modifier.padding(top = 8.dp, start = 4.dp)
                 )
             }
+        }
+
+        // Untere Leiste – mit dem Daumen erreichbar. Lange drücken: Code für versteckte Ordner
+        Row(
+            Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 18.dp)
+                .height(56.dp)
+                .pressable(Pill, onLongClick = {
+                    view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                    codeSheet = true
+                }) { newFolder = true }
+                .glass(Pill, G.fillStrong).padding(horizontal = 22.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Ic.plus, null, tint = Color.White, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Neuer Ordner", style = G.callout.copy(color = Color.White, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold))
         }
 
         NewFolderSheet(newFolder, kind, onDismiss = { newFolder = false })
@@ -185,7 +212,7 @@ fun AlbumsScreen(kind: FolderKind, filter: ItemType?) {
 }
 
 @Composable
-private fun FolderCard(vault: Vault, f: Folder, filter: ItemType?, onLong: () -> Unit, onClick: () -> Unit) {
+private fun FolderCard(vault: Vault, f: Folder, filter: ItemType?, onLong: () -> Unit, onLockNow: (() -> Unit)? = null, onClick: () -> Unit) {
     val unlocked = f.id in vault.unlockedFolders
     val items = if (unlocked) folderItems(vault, f.id, filter) else emptyList()
     val cover = items.firstOrNull { it.type == ItemType.IMAGE || it.type == ItemType.VIDEO || (it.type == ItemType.AUDIO && it.hasThumb) }
@@ -224,15 +251,19 @@ private fun FolderCard(vault: Vault, f: Folder, filter: ItemType?, onLong: () ->
                         FolderKind.NOTES -> Ic.note
                         FolderKind.CHAT -> Ic.chat
                         FolderKind.MUSIC -> Ic.music
+                        FolderKind.BROWSER -> Ic.globe
                     },
                     Color.White.copy(alpha = 0.16f), size = 56.dp, radius = 16, iconSize = 26.dp
                 )
             }
-            if (f.isProtected && unlocked) {
+            if ((f.isProtected && unlocked) || (f.hidden && f.id in vault.revealed)) {
+                // Antippen: sofort wieder sperren / verstecken
                 Box(
-                    Modifier.align(Alignment.TopEnd).padding(8.dp).size(28.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.4f)),
+                    Modifier.align(Alignment.TopEnd).padding(6.dp).size(34.dp)
+                        .pressable(CircleShape, scaleTo = 0.85f, enabled = onLockNow != null) { onLockNow?.invoke() }
+                        .clip(CircleShape).background(Color.Black.copy(alpha = 0.45f)),
                     contentAlignment = Alignment.Center
-                ) { Icon(Ic.unlock, null, tint = Color.White, modifier = Modifier.size(14.dp)) }
+                ) { Icon(if (f.hidden) Ic.eyeOff else Ic.unlock, if (f.hidden) "Wieder verstecken" else "Wieder sperren", tint = Color.White, modifier = Modifier.size(15.dp)) }
             }
         }
         Column(Modifier.padding(horizontal = 4.dp)) {
@@ -372,7 +403,7 @@ fun androidx.compose.foundation.layout.BoxScope.FolderCodeSheet(
         } else {
             wrong = 0
             onDismiss()
-            val what = if (kind == FolderKind.CHAT) "Konto" to "Konten" else "Ordner" to "Ordner"
+            val what = when (kind) { FolderKind.CHAT -> "Konto" to "Konten"; FolderKind.BROWSER -> "Bereich" to "Bereiche"; else -> "Ordner" to "Ordner" }
             App.toast(if (opened.size == 1) "1 ${what.first} geöffnet" else "${opened.size} ${what.second} geöffnet")
             onOpened(opened)
         }
@@ -436,7 +467,7 @@ fun androidx.compose.foundation.layout.BoxScope.FolderCodeSheet(
         }
         if (Auth.available(activity)) {
             Spacer(Modifier.height(10.dp))
-            PillButton("Mit Fingerabdruck", icon = Ic.fingerprint, enabled = !busy, modifier = Modifier.fillMaxWidth()) { tryFinger() }
+            PillButton("Mit Fingerabdruck / Gesicht", icon = Ic.fingerprint, enabled = !busy, modifier = Modifier.fillMaxWidth()) { tryFinger() }
         }
         if (anyRevealed) {
             Spacer(Modifier.height(10.dp))

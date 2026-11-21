@@ -21,37 +21,53 @@ object BrowserData {
     @Volatile
     var used = false
 
-    private fun read(v: Vault): JSONObject = try {
-        v.readBlob("browser")?.let { JSONObject(String(it)) } ?: JSONObject()
+    // Lesezeichen & Ausnahmen liegen verschlüsselt: Standard-Bereich im Tresor, geheime Bereiche im eigenen Ordner.
+    // Ohne Tresor (Tarnung „Browser“) liegen sie in den Tarn-Einstellungen.
+    private fun read(v: Vault?, area: String?): JSONObject = try {
+        val raw = when {
+            v == null -> App.dprefs.getString("browser", null)?.toByteArray()
+            area == null -> v.readBlob("browser")
+            else -> v.readFolderBlob(area, "browser")
+        }
+        raw?.let { JSONObject(String(it)) } ?: JSONObject()
     } catch (e: Exception) {
         JSONObject()
     }
 
-    fun bookmarks(v: Vault): List<Bookmark> = try {
-        val arr = read(v).optJSONArray("bm") ?: JSONArray()
+    private fun write(v: Vault?, area: String?, o: JSONObject) {
+        val b = o.toString().toByteArray()
+        when {
+            v == null -> App.dprefs.edit().putString("browser", String(b)).apply()
+            area == null -> v.writeBlob("browser", b)
+            else -> v.writeFolderBlob(area, "browser", b)
+        }
+    }
+
+    fun bookmarks(v: Vault?, area: String? = null): List<Bookmark> = try {
+        val arr = read(v, area).optJSONArray("bm") ?: JSONArray()
         (0 until arr.length()).map { arr.getJSONObject(it).let { o -> Bookmark(o.getString("t"), o.getString("u")) } }
     } catch (e: Exception) {
         emptyList()
     }
 
-    fun saveBookmarks(v: Vault, list: List<Bookmark>) {
+    fun saveBookmarks(v: Vault?, list: List<Bookmark>, area: String? = null) {
         val arr = JSONArray()
         list.forEach { arr.put(JSONObject().put("t", it.title).put("u", it.url)) }
-        v.writeBlob("browser", read(v).put("bm", arr).toString().toByteArray())
+        write(v, area, read(v, area).put("bm", arr))
     }
 
     /** Seiten, auf denen der Werbeblocker aus ist (verschlüsselt im Tresor, verrät sonst den Verlauf). */
-    fun adOffSites(v: Vault): Set<String> = try {
-        val arr = read(v).optJSONArray("noab") ?: JSONArray()
+    fun adOffSites(v: Vault?, area: String? = null): Set<String> = try {
+        val arr = read(v, area).optJSONArray("noab") ?: JSONArray()
         (0 until arr.length()).map { arr.getString(it) }.toSet()
     } catch (e: Exception) {
         emptySet()
     }
 
-    fun saveAdOffSites(v: Vault, sites: Set<String>) {
+    fun saveAdOffSites(v: Vault?, sites: Set<String>, area: String? = null) {
         val arr = JSONArray()
         sites.forEach { arr.put(it) }
-        v.writeBlob("browser", read(v).put("noab", arr).toString().toByteArray())
+        write(v, area, read(v, area).put("noab", arr))
     }
 
     /** Alles löschen, was der Browser hinterlassen hat. */

@@ -21,9 +21,12 @@
     <!-- Musik: Wiedergabe im Hintergrund; Tarnung „Musik“ liest die normale Musik des Handys -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <!-- Nur für „Mit GPS orten“ in der Wetter-Tarnung (optional, ungefähr) -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
+    <uses-feature android:name="android.hardware.location" android:required="false" />
 
     <queries>
         <intent>
@@ -35,6 +38,11 @@
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:mimeType="*/*" />
+        </intent>
+        <!-- Prüfen, ob ein Telefoncode schon von einer anderen App belegt ist -->
+        <intent>
+            <action android:name="android.provider.Telephony.SECRET_CODE" />
+            <data android:scheme="android_secret_code" />
         </intent>
     </queries>
 
@@ -135,6 +143,59 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity-alias>
+        <activity-alias
+            android:name=".alias.Notizen"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_notizen"
+            android:label="@string/label_notizen"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".alias.Wetter"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_wetter"
+            android:label="@string/label_wetter"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".alias.Browser"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_browser"
+            android:label="@string/label_browser"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- Wetter-Widget (nur aktiv mit der Tarnung „Wetter“) -->
+        <receiver
+            android:name=".disguise.WeatherWidget"
+            android:enabled="false"
+            android:exported="false"
+            android:label="@string/label_wetter">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_weather_info" />
+        </receiver>
+
 
         <service
             android:name=".chat.ChatService"
@@ -153,6 +214,16 @@
         <service
             android:name="org.torproject.jni.TorService"
             android:exported="false" />
+
+        <!-- Geheimer Telefoncode *#*#ZAHL#*#* (selbst gewählt) öffnet den Tresor, auch wenn die App versteckt ist -->
+        <receiver
+            android:name=".SecretCodeReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.provider.Telephony.SECRET_CODE" />
+                <data android:scheme="android_secret_code" />
+            </intent-filter>
+        </receiver>
 
         <receiver
             android:name=".chat.BootReceiver"

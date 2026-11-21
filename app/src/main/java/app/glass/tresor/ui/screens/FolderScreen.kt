@@ -213,7 +213,7 @@ fun FolderScreen(fid: String, filter: ItemType?) {
                     }
                     FolderKind.FILES -> BarButton(Ic.plus, "Datei hinzufügen") { import.pickFiles() }
                     FolderKind.NOTES -> BarButton(Ic.edit, "Neue Notiz") { App.nav.push(Screen.NoteEdit(fid, null)) }
-                    FolderKind.CHAT -> {}
+                    FolderKind.CHAT, FolderKind.BROWSER -> {}
                     FolderKind.MUSIC -> {
                         BarButton(Ic.plus, "Musik hinzufügen") { import.pickAudio() }
                         if (items.any { it.type == ItemType.AUDIO }) RoundBarButton(Ic.shuffle, "Zufällig abspielen") {

@@ -36,6 +36,15 @@ class Vault(val slot: String, val dir: File) {
     val items = mutableStateMapOf<String, List<Item>>()
     val unlockedFolders = mutableStateListOf<String>()
 
+    /**
+     * Container pro Kategorie (Fotos/Videos, Dateien, Notizen, Musik): eigener Schlüssel mit eigenem Schutz.
+     * Gespeichert im verschlüsselten Verzeichnis; der Container-Schlüssel liegt nur im Speicher, solange offen.
+     */
+    private val cats = mutableMapOf<FolderKind, JSONObject>()
+    private val catKeys = mutableMapOf<FolderKind, ByteArray>()
+    /** Gerade geöffnete geschützte Kategorien (für die Oberfläche). */
+    val openCategories = mutableStateListOf<FolderKind>()
+
     /** Ordner, die gerade per Code oder Fingerabdruck hervorgeholt wurden (nur im Speicher). */
     val revealed = mutableStateListOf<String>()
 
@@ -199,6 +208,8 @@ class Vault(val slot: String, val dir: File) {
         unlockedFolders.clear()
         revealed.clear()
         sysGroup = null
+        catKeys.values.forEach { Crypto.wipe(it) }
+        catKeys.clear(); cats.clear(); openCategories.clear()
         ThumbCache.clearSlot(slot)
     }
 
@@ -215,6 +226,8 @@ class Vault(val slot: String, val dir: File) {
         sysGroup = null
         fkeys.values.forEach { Crypto.wipe(it) }
         fkeys.clear(); folders.clear(); items.clear(); unlockedFolders.clear(); revealed.clear()
+        catKeys.values.forEach { Crypto.wipe(it) }
+        catKeys.clear(); cats.clear(); openCategories.clear()
         ThumbCache.clearSlot(slot)
         newFolderInternal("Fotos", FolderKind.MEDIA)
         newFolderInternal("Dateien", FolderKind.FILES)
@@ -297,6 +310,14 @@ class Vault(val slot: String, val dir: File) {
         val arr = root.getJSONArray("folders")
         sysGroup = root.optJSONObject("sysg")
         revealed.clear()
+        catKeys.values.forEach { Crypto.wipe(it) }
+        catKeys.clear(); cats.clear(); openCategories.clear()
+        root.optJSONObject("cats")?.let { c ->
+            for (k in c.keys()) {
+                val kind = try { FolderKind.valueOf(k) } catch (e: Exception) { continue }
+                cats[kind] = c.getJSONObject(k)
+            }
+        }
         val list = (0 until arr.length()).map { Folder.fromJson(arr.getJSONObject(it)) }
         fkeys.values.forEach { Crypto.wipe(it) }
         fkeys.clear()
@@ -321,6 +342,11 @@ class Vault(val slot: String, val dir: File) {
         folders.forEach { arr.put(it.toJson()) }
         val root = JSONObject().put("folders", arr)
         sysGroup?.let { root.put("sysg", it) }
+        if (cats.isNotEmpty()) {
+            val c = JSONObject()
+            cats.forEach { (k, v) -> c.put(k.name, v) }
+            root.put("cats", c)
+        }
         val json = root.toString().toByteArray()
         Crypto.writeAtomic(rootFile, Crypto.seal(k, json, aadRoot))
     }
@@ -354,10 +380,13 @@ class Vault(val slot: String, val dir: File) {
         val k = mk ?: throw IllegalStateException("gesperrt")
         val id = newId()
         val fk = Crypto.random(32)
+        val kc = catKeys[kind]
+        if (kind in cats && kc == null) throw IllegalStateException("Kategorie gesperrt")
         val f = Folder(
             id = id, name = name, kind = kind, protection = Protection.NONE,
             hidden = false, relock = true, created = System.currentTimeMillis(),
-            wrapMk = Crypto.b64(Crypto.seal(k, fk, id.toByteArray()))
+            wrapMk = if (kc == null) Crypto.b64(Crypto.seal(k, fk, id.toByteArray())) else null,
+            wrapCat = kc?.let { Crypto.b64(Crypto.seal(it, fk, cataad(id))) }
         )
         folderDir(id).mkdirs()
         fkeys[id] = fk
@@ -544,6 +573,7 @@ class Vault(val slot: String, val dir: File) {
 
     /** Ein Fingerabdruck → alle Systemsperre-Ordner dieser Art öffnen. Gibt die geöffneten IDs zurück. */
     fun unlockAllSys(c: Cipher, kind: FolderKind): List<String> {
+        if (!isCategoryOpen(kind)) return emptyList() // gesperrter Container verrät nichts
         val gk = groupKeyFrom(c, false) ?: return emptyList()
         val opened = mutableListOf<String>()
         try {
@@ -568,6 +598,7 @@ class Vault(val slot: String, val dir: File) {
      * Systemsperre-Ordner öffnen sich nur per Code, wenn der Fingerabdruck nicht (mehr) geht.
      */
     fun unlockByCode(code: CharArray, kind: FolderKind): List<String> {
+        if (!isCategoryOpen(kind)) return emptyList() // gesperrter Container verrät nichts
         val isVaultCode = verifyPin(code)
         val sysWorks = sysGroupUsable()
         val opened = mutableListOf<String>()
@@ -635,9 +666,15 @@ class Vault(val slot: String, val dir: File) {
         val f = folder(id) ?: return false
         val fk = fkeys[id] ?: return false
         val k = mk ?: return false
-        var nf = f.copy(protection = prot, wrapMk = null, wrapPw = null, wrapSys = null)
+        var nf = f.copy(protection = prot, wrapMk = null, wrapPw = null, wrapSys = null, wrapCat = null)
         when (prot) {
-            Protection.NONE -> nf = nf.copy(wrapMk = Crypto.b64(Crypto.seal(k, fk, id.toByteArray())))
+            Protection.NONE -> {
+                val kc = catKeys[f.kind]
+                nf = if (f.kind in cats) {
+                    if (kc == null) return false
+                    nf.copy(wrapCat = Crypto.b64(Crypto.seal(kc, fk, cataad(id))))
+                } else nf.copy(wrapMk = Crypto.b64(Crypto.seal(k, fk, id.toByteArray())))
+            }
             Protection.PIN -> {
                 if (secret == null || !verifyPin(secret)) return false
                 nf = nf.copy(wrapPw = wrapSecret(secret, fk, faad(id)))
@@ -667,6 +704,134 @@ class Vault(val slot: String, val dir: File) {
             replaceFolder(nf)
             saveRoot()
         }
+        return true
+    }
+
+    // ───────────────────────── Container pro Kategorie ─────────────────────────
+
+    private fun cataad(fid: String) = "cat-$fid".toByteArray()
+    private fun catSecretAad(kind: FolderKind) = "catkey-$slot-${kind.name}".toByteArray()
+    private fun catSysAad(kind: FolderKind) = "catsys-$slot-${kind.name}".toByteArray()
+
+    fun categoryProtection(kind: FolderKind): Protection =
+        cats[kind]?.optString("prot")?.let { try { Protection.valueOf(it) } catch (e: Exception) { null } } ?: Protection.NONE
+
+    /** Ist die Kategorie zugänglich (ungeschützt oder gerade geöffnet)? */
+    fun isCategoryOpen(kind: FolderKind): Boolean = kind !in cats || kind in catKeys
+
+    /** Cipher für die Fingerabdruck-/Gesichts-Abfrage einer Kategorie (null = nicht eingerichtet oder ungültig). */
+    fun categorySysCipher(kind: FolderKind): Cipher? {
+        val w = cats[kind]?.optJSONObject("wSys") ?: return null
+        if (w.optString("g") != sysGroup?.optString("id")) return null
+        return sysGroupUnlockCipher()
+    }
+
+    fun unlockCategory(kind: FolderKind, secret: CharArray): Boolean {
+        val w = cats[kind]?.optString("wPw")?.ifEmpty { null } ?: return false
+        val kc = unwrapSecret(w, secret, catSecretAad(kind)) ?: return false
+        openCategory(kind, kc)
+        return true
+    }
+
+    fun unlockCategorySys(kind: FolderKind, c: Cipher): Boolean {
+        val w = cats[kind]?.optJSONObject("wSys") ?: return false
+        val gk = groupKeyFrom(c, false) ?: return false
+        return try {
+            val kc = Crypto.open(gk, Crypto.unb64(w.getString("ct")), catSysAad(kind))
+            openCategory(kind, kc)
+            true
+        } catch (e: Exception) {
+            false
+        } finally {
+            Crypto.wipe(gk)
+        }
+    }
+
+    @Synchronized
+    private fun openCategory(kind: FolderKind, kc: ByteArray) {
+        catKeys.remove(kind)?.let { Crypto.wipe(it) }
+        catKeys[kind] = kc
+        for (f in folders.toList()) {
+            if (f.kind != kind || f.isProtected) continue
+            val w = f.wrapCat ?: continue
+            try {
+                fkeys[f.id] = Crypto.open(kc, Crypto.unb64(w), cataad(f.id))
+                loadIndex(f.id)
+            } catch (_: Exception) {
+            }
+        }
+        if (kind !in openCategories) openCategories.add(kind)
+    }
+
+    /** Geschützte Kategorie wieder schließen: alle ihre Ordner-Schlüssel aus dem Speicher. */
+    @Synchronized
+    fun relockCategory(kind: FolderKind) {
+        if (kind !in cats) return
+        catKeys.remove(kind)?.let { Crypto.wipe(it) }
+        for (f in folders.toList()) {
+            if (f.kind != kind) continue
+            fkeys.remove(f.id)?.let { Crypto.wipe(it) }
+            items.remove(f.id)
+            unlockedFolders.remove(f.id)
+            revealed.remove(f.id)
+            ThumbCache.evictFolder(slot, f.id)
+        }
+        openCategories.remove(kind)
+    }
+
+    /**
+     * Schutz einer ganzen Kategorie ändern. Die Kategorie muss offen sein.
+     * secret = Tresor-PIN (PIN / SYSTEM) oder neues Passwort (PASSWORD). Bei SYSTEM bleibt die PIN als Notfall-Zugang.
+     * Ordner mit eigenem Schutz behalten ihren Schutz zusätzlich.
+     */
+    @Synchronized
+    fun setCategoryProtection(kind: FolderKind, prot: Protection, secret: CharArray?, sysCipher: Cipher?): Boolean {
+        val k = mk ?: return false
+        if (!isCategoryOpen(kind)) return false
+        val plain = folders.filter { it.kind == kind && !it.isProtected }
+        // Alle ungeschützten Ordner müssen offen sein, sonst ginge ihr Schlüssel verloren
+        if (plain.any { fkeys[it.id] == null }) return false
+        if (prot == Protection.NONE) {
+            plain.forEach { f ->
+                val fk = fkeys[f.id]!!
+                replaceFolder(f.copy(wrapMk = Crypto.b64(Crypto.seal(k, fk, f.id.toByteArray())), wrapCat = null))
+            }
+            cats.remove(kind)
+            catKeys.remove(kind)?.let { Crypto.wipe(it) }
+            openCategories.remove(kind)
+            saveRoot()
+            return true
+        }
+        val kc = catKeys[kind]?.copyOf() ?: Crypto.random(32)
+        val entry = JSONObject().put("prot", prot.name)
+        when (prot) {
+            Protection.PIN -> {
+                if (secret == null || !verifyPin(secret)) return false
+                entry.put("wPw", wrapSecret(secret, kc, catSecretAad(kind)))
+            }
+            Protection.PASSWORD -> {
+                if (secret == null || secret.isEmpty()) return false
+                entry.put("wPw", wrapSecret(secret, kc, catSecretAad(kind)))
+            }
+            Protection.SYSTEM -> {
+                if (secret == null || sysCipher == null || !verifyPin(secret)) return false
+                val gk = groupKeyFrom(sysCipher, true) ?: return false
+                val gid = sysGroup?.optString("id") ?: return false
+                val ct = try { Crypto.seal(gk, kc, catSysAad(kind)) } finally { Crypto.wipe(gk) }
+                entry.put("wPw", wrapSecret(secret, kc, catSecretAad(kind)))
+                entry.put("wSys", JSONObject().put("g", gid).put("ct", Crypto.b64(ct)))
+            }
+            Protection.NONE -> {}
+        }
+        plain.forEach { f ->
+            val fk = fkeys[f.id]!!
+            replaceFolder(f.copy(wrapMk = null, wrapCat = Crypto.b64(Crypto.seal(kc, fk, cataad(f.id)))))
+        }
+        cats[kind] = entry
+        catKeys.remove(kind)?.let { if (it !== kc) Crypto.wipe(it) }
+        catKeys[kind] = kc
+        if (kind !in openCategories) openCategories.add(kind)
+        saveRoot()
         return true
     }
 

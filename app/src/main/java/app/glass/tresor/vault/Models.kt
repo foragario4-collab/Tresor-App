@@ -3,7 +3,8 @@ package app.glass.tresor.vault
 import org.json.JSONObject
 
 /** CHAT = ein weiteres Chat-Konto (eigene Identität, eigene Kontakte), geschützt wie ein Ordner. */
-enum class FolderKind { MEDIA, FILES, NOTES, CHAT, MUSIC }
+/** BROWSER = ein geheimer Browser-Bereich (eigene Tabs/Favoriten), geschützt wie ein Ordner. */
+enum class FolderKind { MEDIA, FILES, NOTES, CHAT, MUSIC, BROWSER }
 enum class Protection { NONE, PIN, PASSWORD, SYSTEM }
 enum class ItemType { IMAGE, VIDEO, FILE, NOTE, AUDIO }
 
@@ -18,6 +19,8 @@ data class Folder(
     val wrapMk: String? = null,
     val wrapPw: String? = null,
     val wrapSys: String? = null,
+    /** Ordner-Schlüssel, verschlüsselt mit dem Container-Schlüssel seiner Kategorie (falls die Kategorie geschützt ist). */
+    val wrapCat: String? = null,
 ) {
     val isProtected get() = protection != Protection.NONE
 
@@ -28,6 +31,7 @@ data class Folder(
         wrapMk?.let { put("wMk", it) }
         wrapPw?.let { put("wPw", it) }
         wrapSys?.let { put("wSys", it) }
+        wrapCat?.let { put("wCat", it) }
     }
 
     companion object {
@@ -42,6 +46,7 @@ data class Folder(
             wrapMk = o.optString("wMk").ifEmpty { null },
             wrapPw = o.optString("wPw").ifEmpty { null },
             wrapSys = o.optString("wSys").ifEmpty { null },
+            wrapCat = o.optString("wCat").ifEmpty { null },
         )
     }
 }

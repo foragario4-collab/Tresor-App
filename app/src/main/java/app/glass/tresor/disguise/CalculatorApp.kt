@@ -39,174 +39,151 @@ import app.glass.tresor.ui.Pill
 import app.glass.tresor.ui.glass
 import app.glass.tresor.ui.pressable
 import kotlinx.coroutines.launch
-import java.math.BigDecimal
-import java.math.MathContext
-import java.math.RoundingMode
 
 private val calcBlobs = listOf(
     Blob(Color(0xFF2F6BF6), 0.0f, 0.3f, 1.0f, 0.32f),
     Blob(Color(0xFF0EA5C6), 1.1f, 0.85f, 0.9f, 0.28f),
 )
 
-/** Voll funktionsfähiger Rechner. Geheim: Code eintippen und „=“ drücken. */
+/**
+ * Rechner wie beim Samsung: ganzer Rechenweg oben, darunter schon während des Tippens das Ergebnis.
+ * Geheim: nur den Code eintippen (ohne Rechenzeichen) und „=“ drücken.
+ */
 @Composable
 fun CalculatorApp() {
     val scope = rememberCoroutineScope()
-    var display by remember { mutableStateOf("0") }
-    var acc by remember { mutableStateOf<BigDecimal?>(null) }
-    var op by remember { mutableStateOf<String?>(null) }
-    var fresh by remember { mutableStateOf(true) }
-    var typed by remember { mutableStateOf("") } // reine Ziffernfolge seit letztem Löschen/Operator
-
-    fun num(s: String): BigDecimal = try {
-        BigDecimal(s.replace(".", "").replace(',', '.'))
-    } catch (e: Exception) {
-        BigDecimal.ZERO
-    }
-
-    fun fmt(v: BigDecimal?): String {
-        if (v == null) return "Fehler"
-        val r = v.round(MathContext(10, RoundingMode.HALF_UP)).stripTrailingZeros()
-        if (r.abs() >= BigDecimal("1e12") || (r.signum() != 0 && r.abs() < BigDecimal("1e-8"))) {
-            return "%.4e".format(r.toDouble()).replace('.', ',')
-        }
-        val plain = r.toPlainString()
-        val neg = plain.startsWith("-")
-        val body = plain.removePrefix("-")
-        val intPart = body.substringBefore('.')
-        val frac = body.substringAfter('.', "")
-        val grouped = intPart.reversed().chunked(3).joinToString(".").reversed()
-        return (if (neg) "-" else "") + grouped + if (frac.isNotEmpty()) ",$frac" else ""
-    }
-
-    fun calc(a: BigDecimal, b: BigDecimal, o: String): BigDecimal? = when (o) {
-        "+" -> a + b
-        "−" -> a - b
-        "×" -> a * b
-        "÷" -> if (b.signum() == 0) null else a.divide(b, MathContext(16, RoundingMode.HALF_UP))
-        else -> b
-    }
+    var expr by remember { mutableStateOf("") }
+    var result by remember { mutableStateOf<String?>(null) } // nach „=“: angezeigtes Ergebnis
+    var typed by remember { mutableStateOf("") } // reine Ziffernfolge (zählt auch führende Nullen, z. B. 0071)
+    var history by remember { mutableStateOf(listOf<Pair<String, String>>()) }
+    var error by remember { mutableStateOf(false) }
 
     fun press(k: String) {
-        when {
-            k.length == 1 && k[0].isDigit() -> {
-                // Eingetippte Ziffern separat merken – so zählen auch führende Nullen (z. B. 0071)
-                if (fresh) typed = k else if (typed.length < 12) typed += k
-                if (fresh || display == "0") {
-                    display = k; fresh = false
-                } else {
-                    val digits = display.count { it.isDigit() }
-                    if (digits >= 12) return
-                    val raw = display.replace(".", "") + k
-                    display = if (raw.contains(',')) raw.substringBefore(',').let { fmt(BigDecimal(it.ifEmpty { "0" })) } + "," + raw.substringAfter(',')
-                    else fmt(BigDecimal(raw))
-                }
+        error = false
+        if (k == "C") { expr = ""; result = null; typed = ""; return }
+        if (k == "=") {
+            val code = typed
+            if (code.length in 4..12 && expr.all { it.isDigit() }) {
+                // Geheimer Zugang – sieht von außen aus wie ein normales „=“
+                scope.launch { App.tryUnlock(code, silent = true) }
+                expr = ""; typed = ""; result = null
+                return
             }
-            k == "," -> {
-                typed = ""
-                if (fresh) { display = "0,"; fresh = false } else if (!display.contains(',')) display += ","
-            }
-            k == "AC" -> { display = "0"; acc = null; op = null; fresh = true; typed = "" }
-            k == "±" -> { display = fmt(num(display).negate()); typed = "" }
-            k == "%" -> { display = fmt(num(display).divide(BigDecimal(100))); fresh = true; typed = "" }
-            k == "=" -> {
-                val code = typed
-                if (op == null && code.length in 4..12 && !display.contains(',')) {
-                    // Geheimer Zugang – sieht von außen aus wie ein normales "="
-                    scope.launch { App.tryUnlock(code, silent = true) }
-                    fresh = true
-                    typed = ""
-                    return
-                }
-                val o = op ?: return
-                val a = acc ?: return
-                display = fmt(calc(a, num(display), o))
-                acc = null; op = null; fresh = true; typed = ""
-            }
-            else -> {
-                val cur = num(display)
-                val a = acc
-                val o = op
-                val result = if (o != null && a != null && !fresh) calc(a, cur, o) else (if (o != null && a != null) a else cur)
-                if (result == null) {
-                    display = "Fehler"; acc = null; op = null
-                } else {
-                    acc = result; display = fmt(result); op = k
-                }
-                fresh = true; typed = ""
-            }
+            if (!CalcEngine.hasOperation(expr)) return
+            val v = CalcEngine.eval(expr)
+            if (v == null) { error = true; return }
+            val r = CalcEngine.format(v)
+            history = (listOf(CalcEngine.pretty(CalcEngine.closeParens(CalcEngine.trimTail(expr))) to r) + history).take(20)
+            result = r
+            // Mit dem Ergebnis weiterrechnen (wissenschaftliche Schreibweise nicht)
+            expr = if (r.contains('e')) "" else r.replace(".", "").let { if (it.startsWith("−")) "(−" + it.drop(1) else it }
+            typed = ""
+            return
         }
+        // Nach einem Ergebnis: Ziffer startet neu, Rechenzeichen rechnet weiter
+        if (result != null) {
+            if (k.length == 1 && (k[0].isDigit() || k == ",")) expr = ""
+            result = null
+        }
+        typed = if (k.length == 1 && k[0].isDigit()) (if (expr.all { it.isDigit() }) typed + k else k).takeLast(12) else ""
+        expr = CalcEngine.input(expr, k)
+        if (expr.length > 120) expr = expr.take(120)
     }
+
+    val preview = if (result == null && CalcEngine.hasOperation(expr)) CalcEngine.eval(expr)?.let { CalcEngine.format(it) } else null
 
     GlassBackground(calcBlobs) {
         Column(
-            Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 18.dp).padding(bottom = 26.dp),
+            Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 16.dp).padding(bottom = 20.dp),
             verticalArrangement = Arrangement.Bottom
         ) {
+            // Verlauf (nur im Arbeitsspeicher)
+            Column(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 10.dp), verticalArrangement = Arrangement.Bottom, horizontalAlignment = Alignment.End) {
+                history.take(3).reversed().forEach { (e, r) ->
+                    Text("$e =", style = androidx.compose.ui.text.TextStyle(fontSize = 15.sp, color = Color.White.copy(alpha = 0.45f)), maxLines = 1)
+                    Text(r, style = androidx.compose.ui.text.TextStyle(fontSize = 18.sp, color = Color.White.copy(alpha = 0.6f)), maxLines = 1)
+                    Spacer(Modifier.height(8.dp))
+                }
+            }
+            val shown = if (result != null) result!! else CalcEngine.pretty(expr).ifEmpty { "0" }
             val size = when {
-                display.length > 11 -> 46.sp
-                display.length > 8 -> 60.sp
-                else -> 80.sp
+                shown.length > 18 -> 30.sp
+                shown.length > 12 -> 40.sp
+                shown.length > 8 -> 54.sp
+                else -> 68.sp
             }
             Text(
-                display,
+                shown,
                 style = androidx.compose.ui.text.TextStyle(fontSize = size, fontWeight = FontWeight.Light, color = Color.White, letterSpacing = (-1).sp),
                 textAlign = TextAlign.End,
-                maxLines = 1,
+                maxLines = 2,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp)
             )
-            Spacer(Modifier.height(18.dp))
+            // Live-Ergebnis
+            Text(
+                if (error) "Ungültige Rechnung" else preview ?: "",
+                style = androidx.compose.ui.text.TextStyle(fontSize = 26.sp, color = if (error) Color(0xFFFF8A8A) else Color.White.copy(alpha = 0.5f)),
+                textAlign = TextAlign.End,
+                maxLines = 1,
+                modifier = Modifier.fillMaxWidth().height(40.dp).padding(horizontal = 10.dp)
+            )
+            Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp), horizontalArrangement = Arrangement.End) {
+                Box(
+                    Modifier.pressable(Pill, haptic = Haptic.KEY) { press("⌫") }.padding(horizontal = 14.dp, vertical = 6.dp)
+                ) { Text("⌫", style = androidx.compose.ui.text.TextStyle(fontSize = 24.sp, color = Color(0xFF7FB2FF))) }
+            }
+            Box(Modifier.fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.12f)))
+            Spacer(Modifier.height(14.dp))
             val rows = listOf(
-                listOf("AC", "±", "%", "÷"),
+                listOf("C", "()", "%", "÷"),
                 listOf("7", "8", "9", "×"),
                 listOf("4", "5", "6", "−"),
                 listOf("1", "2", "3", "+"),
-                listOf("0", ",", "=")
+                listOf("±", "0", ",", "=")
             )
             BoxWithConstraints(Modifier.fillMaxWidth()) {
-            // Exakte Spaltenbreite, damit die breite 0-Taste genau mit den Spalten darüber abschließt
-            val unit = (maxWidth - 14.dp * 3) / 4
-            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                for (r in rows) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                        for (k in r) {
-                            val isOp = k in listOf("÷", "×", "−", "+", "=")
-                            val isFn = k in listOf("AC", "±", "%")
-                            val active = isOp && k != "=" && op == k && fresh
-                            val bg by animateColorAsState(
-                                when {
-                                    active -> Color.White
-                                    isOp -> Color(0xFF2F7CF6)
-                                    isFn -> Color.White.copy(alpha = 0.26f)
-                                    else -> Color.White.copy(alpha = 0.10f)
-                                }, tween(200), label = "key"
-                            )
-                            val fg by animateColorAsState(if (active) Color(0xFF2F7CF6) else Color.White, tween(200), label = "keyfg")
-                            val wide = k == "0"
-                            Box(
-                                Modifier
-                                    .width(if (wide) unit * 2 + 14.dp else unit)
-                                    .height(minOf(78.dp, unit))
-                                    .pressable(Pill, scaleTo = 0.93f, highlight = 0.25f, haptic = Haptic.KEY) { press(k) }
-                                    .glass(Pill, bg),
-                                contentAlignment = if (wide) Alignment.CenterStart else Alignment.Center
-                            ) {
-                                Text(
-                                    k,
-                                    style = androidx.compose.ui.text.TextStyle(
-                                        fontSize = if (isFn) 28.sp else 34.sp,
-                                        fontWeight = if (isFn) FontWeight.Medium else FontWeight.Normal,
-                                        color = fg
-                                    ),
-                                    modifier = if (wide) Modifier.padding(start = 30.dp) else Modifier
+                val unit = (maxWidth - 12.dp * 3) / 4
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    for (r in rows) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            for (k in r) {
+                                val isOp = k in listOf("÷", "×", "−", "+")
+                                val isEq = k == "="
+                                val isFn = k in listOf("C", "()", "%")
+                                val bg by animateColorAsState(
+                                    when {
+                                        isEq -> Color(0xFF2F7CF6)
+                                        isOp || isFn -> Color.White.copy(alpha = 0.20f)
+                                        else -> Color.White.copy(alpha = 0.10f)
+                                    }, tween(200), label = "key"
                                 )
+                                val fg = when {
+                                    k == "C" -> Color(0xFFFF7A7A)
+                                    isOp || k == "()" || k == "%" -> Color(0xFF8FE3A8)
+                                    else -> Color.White
+                                }
+                                Box(
+                                    Modifier
+                                        .width(unit)
+                                        .height(minOf(74.dp, unit))
+                                        .pressable(Pill, scaleTo = 0.93f, highlight = 0.25f, haptic = Haptic.KEY) { press(k) }
+                                        .glass(Pill, bg),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        k,
+                                        style = androidx.compose.ui.text.TextStyle(
+                                            fontSize = if (isFn || k == "±") 26.sp else 32.sp,
+                                            fontWeight = if (isFn) FontWeight.Medium else FontWeight.Normal,
+                                            color = fg
+                                        )
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
-            }
         }
     }
 }
-
