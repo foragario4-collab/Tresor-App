@@ -60,6 +60,7 @@ import app.glass.tresor.ui.G
 import app.glass.tresor.ui.GlassBackground
 import app.glass.tresor.ui.GlassField
 import app.glass.tresor.ui.Ic
+import app.glass.tresor.ui.Pill
 import app.glass.tresor.ui.PillButton
 import app.glass.tresor.ui.Sheet
 import app.glass.tresor.ui.SheetHeader
