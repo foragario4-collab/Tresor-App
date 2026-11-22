@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg">#FF07080C</color>
+    <color name="icon_rechner">#FF3A3F4B</color>
+    <color name="icon_kalender">#FFFFFFFF</color>
+    <color name="icon_checkliste">#FF2F9E5B</color>
+    <color name="icon_news">#FF2F6BF6</color>
+    <color name="icon_musik">#FFF2545B</color>
+    <color name="icon_notizen">#FFF5C451</color>
+    <color name="icon_wetter">#FF2F80ED</color>
+    <color name="icon_browser">#FF0E9F8E</color>
+</resources>

@@ -1,0 +1,248 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Nur für die News-Tarnung. Der Tresor selbst enthält keinen Netzwerk-Code. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Merken, wenn das Internet wieder da ist → wartende Nachrichten sofort senden -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+    <!-- Für In-App-Updates (APK aus deinem GitHub-Repo installieren) -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- Chat: Tor im Hintergrund + Benachrichtigung + QR-Scanner -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Sprachnachrichten und Anrufe im Chat -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Musik: Wiedergabe im Hintergrund; Tarnung „Musik“ liest die normale Musik des Handys -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <!-- Nur für „Mit GPS orten“ in der Wetter-Tarnung (optional, ungefähr) -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
+    <uses-feature android:name="android.hardware.location" android:required="false" />
+
+    <queries>
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE" />
+        </intent>
+        <intent>
+            <action android:name="android.media.action.VIDEO_CAPTURE" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:mimeType="*/*" />
+        </intent>
+        <!-- Prüfen, ob ein Telefoncode schon von einer anderen App belegt ist -->
+        <intent>
+            <action android:name="android.provider.Telephony.SECRET_CODE" />
+            <data android:scheme="android_secret_code" />
+        </intent>
+    </queries>
+
+    <application
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:icon="@mipmap/ic_tresor"
+        android:roundIcon="@mipmap/ic_tresor"
+        android:label="@string/label_tresor"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Tresor"
+        tools:targetApi="35">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode|density|smallestScreenSize" />
+
+        <!-- Normalmodus: eigenes Logo, Name "Tresor" -->
+        <activity-alias
+            android:name=".alias.Tresor"
+            android:enabled="true"
+            android:exported="true"
+            android:icon="@mipmap/ic_tresor"
+            android:roundIcon="@mipmap/ic_tresor"
+            android:label="@string/label_tresor"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".alias.Rechner"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_rechner"
+            android:label="@string/label_rechner"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".alias.Kalender"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_kalender"
+            android:label="@string/label_kalender"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".alias.Checkliste"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_checkliste"
+            android:label="@string/label_checkliste"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".alias.News"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_news"
+            android:label="@string/label_news"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".alias.Musik"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_musik"
+            android:label="@string/label_musik"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".alias.Notizen"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_notizen"
+            android:label="@string/label_notizen"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".alias.Wetter"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_wetter"
+            android:label="@string/label_wetter"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".alias.Browser"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_browser"
+            android:label="@string/label_browser"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <!-- Wetter-Widget (nur aktiv mit der Tarnung „Wetter“) -->
+        <receiver
+            android:name=".disguise.WeatherWidget"
+            android:enabled="false"
+            android:exported="false"
+            android:label="@string/label_wetter">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_weather_info" />
+        </receiver>
+
+
+        <service
+            android:name=".chat.ChatService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Peer-to-peer messaging over Tor onion services without a server" />
+        </service>
+
+        <service
+            android:name=".music.MusicService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
+
+        <service
+            android:name="org.torproject.jni.TorService"
+            android:exported="false" />
+
+        <!-- Geheimer Telefoncode *#*#ZAHL#*#* (selbst gewählt) öffnet den Tresor, auch wenn die App versteckt ist -->
+        <receiver
+            android:name=".SecretCodeReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.provider.Telephony.SECRET_CODE" />
+                <data android:scheme="android_secret_code" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".chat.BootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+    </application>
+</manifest>

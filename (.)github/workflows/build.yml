@@ -1,0 +1,100 @@
+name: APK bauen
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Mehrere Uploads kurz hintereinander (z. B. Dateien in mehreren Schritten hochgeladen):
+# nur der neueste Stand wird gebaut, ältere laufende Builds werden abgebrochen.
+concurrency:
+  group: apk-build
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # Android-SDK ist auf den GitHub-Servern bereits vorinstalliert (ANDROID_HOME)
+      - name: Android-Lizenzen bestätigen
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.11.1"
+
+      # Signierschlüssel aus den GitHub Secrets holen (liegt nie im Repo)
+      - name: Signierschlüssel laden
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::Secret KEYSTORE_BASE64 fehlt – siehe README (Abschnitt Signierschlüssel)."
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > app/release.jks
+
+      # Werbeblocker: aktuelle Listen (wie uBlock/Brave) herunterladen und in die App packen
+      - name: Werbeblocker-Listen laden
+        run: |
+          mkdir -p app/src/main/assets
+          for u in https://easylist.to/easylist/easylist.txt https://easylist.to/easylist/easyprivacy.txt; do
+            curl -fsSL --retry 3 "$u" || true
+          done | grep -E '^\|\|[a-z0-9.-]+\^$' | sed -E 's/^\|\|//; s/\^$//' | sort -u > app/src/main/assets/adblock.txt || true
+          echo "Werbeblocker: $(wc -l < app/src/main/assets/adblock.txt) Adressen"
+
+      - name: Versionsnummer festlegen
+        run: |
+          echo "VC=$(( $(date +%s) / 60 ))" >> $GITHUB_ENV
+          # Fingerabdruck des App-Quellcodes: gleich = gleiche Version (egal wie oft gebaut wird)
+          echo "SRC=$(git rev-parse HEAD:app | cut -c1-12)" >> $GITHUB_ENV
+
+      # Gibt es schon ein Release mit genau diesem Quellcode? Dann kein neues Update anbieten.
+      - name: Schon veröffentlicht?
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          body=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/${{ github.repository }}/releases/latest" || true)
+          if echo "$body" | grep -q "src:${SRC}"; then
+            echo "Quellcode unverändert (src:${SRC}) – es wird kein neues Release angelegt."
+            echo "SAME=1" >> $GITHUB_ENV
+          else
+            echo "SAME=0" >> $GITHUB_ENV
+          fi
+
+      - name: APK bauen
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: gradle assembleRelease --stacktrace -PbuildNumber=${{ github.run_number }} -PversionCode=${{ env.VC }} -PgithubRepo=${{ github.repository }} -PsourceHash=${{ env.SRC }}
+
+      - name: Schlüssel wieder entfernen
+        if: always()
+        run: rm -f app/release.jks
+
+      - name: APK umbenennen
+        run: cp app/build/outputs/apk/release/*.apk Tresor-1.${{ github.run_number }}.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Tresor-APK
+          path: Tresor-1.${{ github.run_number }}.apk
+
+      # Release anlegen – daraus holt sich die App ihre Updates
+      - name: Release veröffentlichen
+        if: env.SAME != '1'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.VC }}
+          name: Tresor 1.${{ github.run_number }}
+          body: "Automatischer Build ${{ github.run_number }} · src:${{ env.SRC }}"
+          files: Tresor-1.${{ github.run_number }}.apk
+          make_latest: true

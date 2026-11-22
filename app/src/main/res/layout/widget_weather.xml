@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/wx_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_weather_bg"
+    android:orientation="vertical"
+    android:padding="14dp">
+
+    <TextView
+        android:id="@+id/wx_city"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="#FFFFFFFF"
+        android:textSize="15sp"
+        android:textStyle="bold"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:text="Wetter" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/wx_temp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#FFFFFFFF"
+            android:textSize="40sp"
+            android:fontFamily="sans-serif-light"
+            android:text="–" />
+
+        <TextView
+            android:id="@+id/wx_icon"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:textColor="#FFFFE38A"
+            android:textSize="28sp"
+            android:text="☁" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/wx_desc"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="#FFFFFFFF"
+        android:textSize="13sp"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:text="" />
+
+    <TextView
+        android:id="@+id/wx_range"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="#CCFFFFFF"
+        android:textSize="12sp"
+        android:maxLines="1"
+        android:text="" />
+</LinearLayout>

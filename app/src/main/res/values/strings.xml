@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="label_tresor">Tresor</string>
+    <string name="label_rechner">Rechner</string>
+    <string name="label_kalender">Kalender</string>
+    <string name="label_checkliste">Checkliste</string>
+    <string name="label_news">News</string>
+    <string name="label_musik">Musik</string>
+    <string name="label_notizen">Notizen</string>
+    <string name="label_wetter">Wetter</string>
+    <string name="label_browser">Browser</string>
+    <string name="widget_weather">Aktuelles Wetter</string>
+</resources>
