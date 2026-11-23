@@ -141,6 +141,21 @@ private val handbook = listOf(
         "Für jeden Anruf entstehen neue Einmal-Schlüssel – nach dem Auflegen sind sie weg.",
         "Über Tor kommt die Sprache etwa 0,5–2 Sekunden verzögert an. Das ist der Preis für die Anonymität.",
     )),
+    Chapter(Ic.calendar, "Kalender", listOf(
+        "Monat wechseln: Pfeile oben oder seitlich über den Kalender wischen. Ein Punkt unter dem Tag = es gibt Termine.",
+        "+ oder „Keine Termine“ antippen = neuer Termin. Uhrzeit als Ziffern, z. B. 1830 – leer lassen = ganztägig. Farbe und Notiz nach Wunsch.",
+        "Es gibt bewusst keine Erinnerungen: Eine Mitteilung auf dem Sperrbildschirm könnte verraten, was im Tresor steht.",
+    )),
+    Chapter(Ic.lock, "Passwörter", listOf(
+        "+ = neuer Eintrag mit Titel, Benutzername, Passwort, Website und Notiz. „Erzeugen“ macht ein starkes Zufallspasswort, darunter siehst du die Stärke.",
+        "Im Eintrag: Auge = Passwort anzeigen, Kopieren-Symbol = in die Zwischenablage. Android erfährt, dass es sensibel ist, und nach 45 Sekunden wird es wieder gelöscht.",
+        "Alles liegt verschlüsselt nur in diesem Tresor – keine Cloud, kein Konto. Jeder geheime Tresor hat seine eigenen Passwörter.",
+    )),
+    Chapter(Ic.mic, "Sprachmemos", listOf(
+        "Roter Knopf = Aufnahme starten, nochmal tippen = stoppen und sichern. Bis zu 30 Minuten.",
+        "Aufnahme antippen = abspielen, umbenennen oder löschen.",
+        "Der Ton liegt nur verschlüsselt im Tresor. Wird der Tresor während einer Aufnahme gesperrt, wird sie vorher noch gesichert.",
+    )),
     Chapter(Ic.person, "Telefon & Kontakte", listOf(
         "Auf dem Startbildschirm unten „Telefon“ öffnet die Telefon-App: Favoriten, Zuletzt (alle Anrufe), Kontakte und Sprachnachrichten. Ein Tipp auf das Telefon-Symbol ruft zurück.",
         "„Kontakte“ zeigt alle Chat-Kontakte von A bis Z, mit Suche. Ganz oben „Meine Karte“ – dein QR-Code zum Hinzufügen.",

@@ -100,7 +100,6 @@ fun HomeScreen() {
     val vault = App.vault ?: return
     var query by remember { mutableStateOf("") }
     var searching by remember { mutableStateOf(false) }
-    var soon by remember { mutableStateOf<String?>(null) }
     var control by remember { mutableStateOf(false) }
 
     val visible = vault.folders.filter { !it.hidden && it.id in vault.unlockedFolders }
@@ -180,11 +179,11 @@ fun HomeScreen() {
                         { m -> AppIcon(R.drawable.ico_notizen, "Notizen", m, locked(FolderKind.NOTES), onLong = { catSettings(FolderKind.NOTES) }) { openCat(FolderKind.NOTES, Screen.Albums(FolderKind.NOTES, null)) } },
                         { m -> AppIcon(R.drawable.ico_musik, "Musik", m, locked(FolderKind.MUSIC), onLong = { catSettings(FolderKind.MUSIC) }) { openCat(FolderKind.MUSIC, Screen.Albums(FolderKind.MUSIC, null)) } },
                         { m -> AppIcon(R.drawable.ico_kamera, "Kamera", m, onLong = { camera(true) }) { camera(false) } },
-                        { m -> AppIcon(R.drawable.ico_kalender, "Kalender", m, overlay = { CalendarFace(cal) }) { soon = "Kalender" } },
-                        { m -> AppIcon(R.drawable.ico_passwoerter, "Passwörter", m) { soon = "Passwörter" } },
+                        { m -> AppIcon(R.drawable.ico_kalender, "Kalender", m, overlay = { CalendarFace(cal) }) { App.nav.push(Screen.Calendar) } },
+                        { m -> AppIcon(R.drawable.ico_passwoerter, "Passwörter", m) { App.nav.push(Screen.Passwords) } },
                         { m -> AppIcon(R.drawable.ico_browser, "Browser", m) { App.nav.push(Screen.Browser) } },
                         { m -> AppIcon(R.drawable.ico_kontakte, "Kontakte", m) { App.nav.push(Screen.Contacts) } },
-                        { m -> AppIcon(R.drawable.ico_sprachmemo, "Sprachmemo", m) { soon = "Sprachmemo" } },
+                        { m -> AppIcon(R.drawable.ico_sprachmemo, "Sprachmemo", m) { App.nav.push(Screen.Memos) } },
                         { m -> AppIcon(R.drawable.ico_einstellungen, "Einstellungen", m) { App.nav.push(Screen.Settings) } },
                     )
                     apps.chunked(4).forEach { row ->
@@ -238,11 +237,6 @@ fun HomeScreen() {
             },
         )
 
-        Sheet(soon != null, { soon = null }) {
-            SheetHeader(Ic.info, soon ?: "", "Diese App kommt mit einem der nächsten Updates – verschlüsselt im Tresor, wie alles hier.")
-            PillButton("Verstanden", primary = true, modifier = Modifier.fillMaxWidth()) { soon = null }
-            Spacer(Modifier.navigationBarsPadding())
-        }
     }
 }
 

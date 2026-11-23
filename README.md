@@ -29,7 +29,10 @@ Nach dem Entsperren sieht der Tresor aus wie ein eigenes Handy:
 - **Kontakte-App**: A–Z mit Suche, „Meine Karte“ (QR-Code), Kontakt mit Nachricht/Anrufen/Sprache/Favorit, eigenem Spitznamen, Geburtstag und Notiz (nur verschlüsselt bei dir, wird nie verschickt) und Sicherheitsnummer.
 - **Kontrollzentrum** (oben nach unten wischen): Browser über Tor, Snowflake, Chat im Hintergrund, Kamera, Musik, Bewegungs-/Umdreh-Sperre, eigene Tastatur, Bewegungs-Empfindlichkeit, Jetzt sperren.
 - **Sperrbildschirm** wie am iPhone: Datum, große Uhrzeit, runde Glastasten mit Buchstaben, Fingerabdruck unten links.
-- Kalender, Passwörter und Sprachmemo sind als Symbole schon da und kommen mit den nächsten Updates.
+- **Kalender:** Monatsansicht (wischen = Monat wechseln), Termine mit Uhrzeit oder ganztägig, Farbe und Notiz. Bewusst ohne Erinnerungs-Mitteilungen.
+- **Passwörter:** A–Z mit Suche, Benutzername/Passwort/Website/Notiz, Generator für starke Passwörter, Stärke-Anzeige. Kopiertes wird als „sensibel“ markiert und nach 45 Sekunden aus der Zwischenablage gelöscht.
+- **Sprachmemos:** bis zu 30 Minuten, Pegel-Anzeige, Abspielen, Umbenennen, Löschen. Der Ton liegt nur verschlüsselt im Tresor; beim Sperren wird eine laufende Aufnahme noch gesichert.
+- Alle drei liegen verschlüsselt im jeweiligen Tresor und sind in anderen (geheimen) Tresoren unsichtbar.
 
 ## Erster Start
 

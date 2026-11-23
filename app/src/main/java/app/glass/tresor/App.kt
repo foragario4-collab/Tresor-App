@@ -52,6 +52,10 @@ sealed interface Screen {
     data object ChatTips : Screen
     data object ChatAdd : Screen
     data object Phone : Screen
+    data object Calendar : Screen
+    data object Passwords : Screen
+    data class PasswordEntry(val id: String?) : Screen
+    data object Memos : Screen
     data object Contacts : Screen
     data class ContactDetail(val contactId: String) : Screen
     data object Player : Screen

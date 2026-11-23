@@ -16,10 +16,10 @@ import java.io.RandomAccessFile
  * Aufnahme einer Sprachnachricht (Opus, sonst AAC).
  * Die Aufnahme liegt nur kurz im privaten App-Speicher und wird danach überschrieben und gelöscht.
  */
-class VoiceRecorder(private val ctx: Context) {
+class VoiceRecorder(private val ctx: Context, private val maxMs: Long = ChatEngine.MAX_VOICE_MS, tmpName: String = "voice.tmp") {
     private var rec: MediaRecorder? = null
     @Volatile private var maxReached = false
-    private val file = File(ctx.noBackupFilesDir, "voice.tmp")
+    private val file = File(ctx.noBackupFilesDir, tmpName)
     var startedAt = 0L
         private set
 
@@ -41,7 +41,7 @@ class VoiceRecorder(private val ctx: Context) {
                     r.setAudioEncodingBitRate(48000)
                 }
                 r.setAudioChannels(1)
-                r.setMaxDuration(ChatEngine.MAX_VOICE_MS.toInt())
+                r.setMaxDuration(maxMs.toInt())
                 maxReached = false
                 r.setOnInfoListener { _, what, _ ->
                     if (what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_DURATION_REACHED) maxReached = true
@@ -61,6 +61,16 @@ class VoiceRecorder(private val ctx: Context) {
     }
 
     val elapsed get() = if (rec == null) 0L else System.currentTimeMillis() - startedAt
+
+    /** Lautstärke seit der letzten Abfrage, 0..1 (für die Pegel-Anzeige). */
+    fun level(): Float = try {
+        ((rec?.maxAmplitude ?: 0) / 32767f).coerceIn(0f, 1f)
+    } catch (e: Exception) {
+        0f
+    }
+
+    /** Hat die Aufnahme die Höchstlänge erreicht? */
+    val limitReached get() = maxReached
 
     /** Beendet die Aufnahme. Gibt (Audio, Dauer) zurück oder null, wenn sie zu kurz war. */
     fun stop(): Pair<ByteArray, Long>? {
@@ -140,6 +150,10 @@ object VoicePlayer {
             stop()
         }
     }
+
+    /** Aktuelle Stelle und Länge der laufenden Wiedergabe in ms. */
+    fun position(): Long = try { player?.currentPosition?.toLong() ?: 0L } catch (e: Exception) { 0L }
+    fun duration(): Long = try { player?.duration?.toLong()?.coerceAtLeast(0L) ?: 0L } catch (e: Exception) { 0L }
 
     /** Fortschritt 0..1 der laufenden Wiedergabe. */
     fun progress(): Float = try {

@@ -180,6 +180,7 @@ fun GlassField(
     autoFocus: Boolean = false,
     singleLine: Boolean = true,
     onDone: (() -> Unit)? = null,
+    keyboardType: KeyboardType? = null,
 ) {
     var show by remember { mutableStateOf(false) }
     val fr = remember { FocusRequester() }
@@ -206,6 +207,7 @@ fun GlassField(
                 visualTransformation = if (password && !show) PasswordVisualTransformation() else VisualTransformation.None,
                 keyboardOptions = KeyboardOptions(
                     keyboardType = when {
+                        keyboardType != null -> keyboardType
                         numeric -> KeyboardType.NumberPassword
                         password -> KeyboardType.Password
                         else -> KeyboardType.Text
