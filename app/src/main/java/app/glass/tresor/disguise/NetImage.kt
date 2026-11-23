@@ -33,9 +33,7 @@ object NetImages {
     fun load(url: String, maxSide: Int = 900): Bitmap? {
         cache.get(url)?.let { return it }
         if (!url.startsWith("https://")) return null
-        val c = URL(url).openConnection() as HttpURLConnection
-        c.connectTimeout = 10_000
-        c.readTimeout = 15_000
+        val c = app.glass.tresor.net.TorNet.open(url)
         c.instanceFollowRedirects = true
         c.setRequestProperty("User-Agent", "Mozilla/5.0 (Android) News")
         try {

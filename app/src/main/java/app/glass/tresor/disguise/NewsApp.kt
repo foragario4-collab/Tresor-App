@@ -83,9 +83,7 @@ private val feeds = listOf(
  * er hat keinerlei Zugriff auf den Tresor.
  */
 private fun fetch(feed: Feed): List<Article> {
-    val c = URL(feed.url).openConnection() as HttpURLConnection
-    c.connectTimeout = 10_000
-    c.readTimeout = 15_000
+    val c = app.glass.tresor.net.TorNet.open(feed.url)
     c.instanceFollowRedirects = true
     c.setRequestProperty("User-Agent", "Mozilla/5.0 (Android) News")
     try {

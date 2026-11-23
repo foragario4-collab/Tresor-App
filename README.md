@@ -52,7 +52,7 @@ Fotos & Videos, Dateien, Notizen und Musik können je einen eigenen Schlüssel b
 ## Geschützte Ordner
 
 Ordner lange drücken → Schutz wählen: Tresor-PIN, eigenes Passwort oder Systemsperre (Fingerabdruck, die PIN funktioniert immer als Notfall).
-„Ordner verstecken“ macht ihn komplett unsichtbar. Hervorholen: unten die Leiste „Neuer Ordner“ lange drücken (gut mit dem Daumen erreichbar) oder lange auf den Titel drücken und den Code eingeben. Das Schloss am Ordner versteckt ihn sofort wieder.
+„Ordner verstecken“ macht ihn komplett unsichtbar. Hervorholen: unten die Leiste „Neuer Ordner“ lange drücken (gut mit dem Daumen erreichbar) oder lange auf den Titel drücken und den Code eingeben – auf einem Ziffernblock wie am iPhone (unten links Fingerabdruck, „Code mit Buchstaben“ für Passwörter). Das Schloss am Ordner versteckt ihn sofort wieder.
 
 - Ein Code öffnet genau die Ordner, die diesen Code als Passwort haben (z. B. 4711 → „Urlaub“ und „Privat“, 9999 → nur „Geheim“).
 - „Mit Fingerabdruck“ öffnet mit einem einzigen Abdruck alle Ordner mit Systemsperre.
@@ -101,6 +101,16 @@ Damit es im Hintergrund zuverlässig läuft: Chat → Tipps → Akku-Optimierung
 - Sprache: 8 kHz µ-law (Telefonqualität). Über Tor kommt sie etwa 0,5 bis 2 Sekunden verzögert an.
 - Ein Anruf klingelt auch bei gesperrtem Tresor (Mitteilung „Eingehender Anruf“, ohne Namen). Annehmen kannst du ihn nach dem Entsperren des richtigen Tresors, innerhalb von 45 Sekunden.
 - Wenn du die App verlässt oder mit der Seitentaste sperrst, endet das Gespräch. Am Ohr schaltet der Näherungssensor den Bildschirm ab, das Gespräch läuft dabei weiter.
+
+## Tor-Verbindung & Snowflake
+
+Einstellungen → „Tor-Verbindung“:
+- **Direkt:** am schnellsten. Der Internetanbieter sieht, dass Tor benutzt wird, aber nicht wofür.
+- **Snowflake:** Tor-Verkehr sieht aus wie ein Videoanruf (WebRTC). Niemand erkennt, dass Tor benutzt wird. Erster Start 1–2 Minuten.
+- **Eigene Brücken:** obfs4-/webtunnel-Zeilen von bridges.torproject.org einfügen (eine pro Zeile).
+
+Gilt für Chat, Anrufe und den Tor-Modus im Browser. Läuft Tor, gehen auch Update-Prüfung, Wetter, News und Bilder über Tor (inklusive Namensauflösung). Ein VPN ist für die App nicht nötig.
+Technik: IPtProxy (Snowflake/Lyrebird) des Guardian Project. Die APK enthält nur noch ARM-Prozessorteile (alle echten Handys), das hält sie kleiner.
 
 ## Musik
 

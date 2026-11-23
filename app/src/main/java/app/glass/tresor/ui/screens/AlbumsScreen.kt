@@ -62,6 +62,7 @@ import app.glass.tresor.ui.GlassField
 import app.glass.tresor.ui.Ic
 import app.glass.tresor.ui.Pill
 import app.glass.tresor.ui.PillButton
+import app.glass.tresor.ui.PinPad
 import app.glass.tresor.ui.Sheet
 import app.glass.tresor.ui.SheetHeader
 import app.glass.tresor.ui.Thumb
@@ -446,28 +447,45 @@ fun androidx.compose.foundation.layout.BoxScope.FolderCodeSheet(
 
     Sheet(visible, onDismiss) {
         SheetHeader(Ic.keypad, "Ordner öffnen", error ?: "Code eingeben – es erscheinen genau die Ordner mit diesem Code.")
-        GlassField(
-            code, { code = it; error = null },
-            "Code",
-            password = true, numeric = !letters, autoFocus = visible,
-            onDone = { tryCode() }
-        )
-        Text(
-            if (letters) "Nur Zahlen" else "Mit Buchstaben",
-            style = G.footnote.copy(color = G.dim),
-            modifier = Modifier
-                .align(Alignment.End)
-                .padding(top = 6.dp)
-                .pressable(androidx.compose.foundation.shape.RoundedCornerShape(50)) { letters = !letters }
-                .padding(horizontal = 12.dp, vertical = 8.dp)
-        )
-        Spacer(Modifier.height(8.dp))
+        if (!letters) {
+            // Wie der Sperrbildschirm am iPhone: Punkte mittig, runde Glastasten
+            val fingerKey: @Composable () -> Unit = {
+                Box(
+                    Modifier.fillMaxSize().pressable(CircleShape, scaleTo = 0.9f) { tryFinger() },
+                    contentAlignment = Alignment.Center
+                ) { Icon(Ic.fingerprint, "Mit Fingerabdruck oder Gesicht", tint = Color.White, modifier = Modifier.size(32.dp)) }
+            }
+            PinPad(
+                code = code,
+                onChange = { code = it; error = null },
+                error = error != null,
+                left = if (Auth.available(activity)) fingerKey else null
+            )
+            Spacer(Modifier.height(18.dp))
+        } else {
+            GlassField(
+                code, { code = it; error = null },
+                "Code",
+                password = true, numeric = false, autoFocus = visible,
+                onDone = { tryCode() }
+            )
+            Spacer(Modifier.height(12.dp))
+        }
         Box(Modifier.fillMaxWidth().height(52.dp), contentAlignment = Alignment.Center) {
             if (busy) CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(26.dp))
             else PillButton("Öffnen", primary = true, enabled = code.isNotEmpty(), modifier = Modifier.fillMaxWidth()) { tryCode() }
         }
-        if (Auth.available(activity)) {
-            Spacer(Modifier.height(10.dp))
+        Text(
+            if (letters) "Nur Zahlen" else "Code mit Buchstaben",
+            style = G.footnote.copy(color = G.dim),
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .padding(top = 8.dp)
+                .pressable(androidx.compose.foundation.shape.RoundedCornerShape(50)) { letters = !letters; code = ""; error = null }
+                .padding(horizontal = 14.dp, vertical = 10.dp)
+        )
+        if (letters && Auth.available(activity)) {
+            Spacer(Modifier.height(6.dp))
             PillButton("Mit Fingerabdruck / Gesicht", icon = Ic.fingerprint, enabled = !busy, modifier = Modifier.fillMaxWidth()) { tryFinger() }
         }
         if (anyRevealed) {

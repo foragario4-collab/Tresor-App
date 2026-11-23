@@ -6,6 +6,12 @@
 -dontwarn org.torproject.**
 -dontwarn net.freehaven.tor.control.**
 
+# Tor-Brücken (IPtProxy, gomobile) – wird per Reflection angesprochen
+-keep class IPtProxy.** { *; }
+-keep class go.** { *; }
+-dontwarn IPtProxy.**
+-dontwarn go.**
+
 # BouncyCastle (X25519, HKDF) – nutzt intern Reflection
 -keep class org.bouncycastle.** { *; }
 -dontwarn org.bouncycastle.**

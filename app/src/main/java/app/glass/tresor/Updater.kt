@@ -41,9 +41,7 @@ object Updater {
     }
 
     private fun open(url: String, auth: Boolean, accept: String): HttpURLConnection {
-        val c = URL(url).openConnection() as HttpURLConnection
-        c.connectTimeout = 15_000
-        c.readTimeout = 30_000
+        val c = app.glass.tresor.net.TorNet.open(url)
         c.instanceFollowRedirects = false
         c.setRequestProperty("Accept", accept)
         c.setRequestProperty("User-Agent", "Tresor-Updater")

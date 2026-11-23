@@ -42,6 +42,8 @@ android {
         val repo = (project.findProperty("githubRepo") as String?) ?: ""
         buildConfigField("String", "GITHUB_REPO", "\"$repo\"")
         buildConfigField("String", "CERT_SHA256", "\"$certSha256\"")
+        // Nur echte Handy-Prozessoren (spart viele MB: Tor und Brücken bringen sonst auch x86-Teile mit)
+        ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
         // Fingerabdruck des Quellcodes (von GitHub) – erkennt „gleiche Version, nur neu gebaut“
         val src = ((project.findProperty("sourceHash") as String?) ?: "").filter { it.isLetterOrDigit() }.take(40)
         buildConfigField("String", "SOURCE_HASH", "\"$src\"")
@@ -123,6 +125,8 @@ dependencies {
     // Chat: Tor (Onion-Dienste), Schlüsselaustausch X25519, QR-Codes
     implementation("info.guardianproject:tor-android:0.4.8.16")
     implementation("info.guardianproject:jtorctl:0.4.5.7")
+    // Tor-Brücken (Snowflake, obfs4, webtunnel) – damit der Anbieter Tor nicht erkennt
+    implementation("com.netzarchitekten:IPtProxy:5.5.1")
     implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
     implementation("com.google.zxing:core:3.5.3")
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")

@@ -238,6 +238,8 @@ class ChatService : Service() {
             sb.append("HiddenServiceDir ").append(ChatSpool.hsDir(this, it.slot).absolutePath).append('\n')
             sb.append("HiddenServicePort 80 127.0.0.1:").append(it.port).append('\n')
         }
+        // Tor-Brücken (Snowflake/eigene), damit der Internetanbieter Tor nicht erkennt
+        sb.append(Bridges.torrc(this))
         TorService.getTorrc(this).writeText(sb.toString())
         startListeners(reg)
         bound = bindService(Intent(this, TorService::class.java), conn, Context.BIND_AUTO_CREATE)
@@ -251,6 +253,7 @@ class ChatService : Service() {
         }
         try { stopService(Intent(this, TorService::class.java)) } catch (_: Exception) {}
         tor = null
+        Bridges.stopAll()
     }
 
     private fun restartTor() {

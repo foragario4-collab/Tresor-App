@@ -42,9 +42,7 @@ object WeatherData {
     }
 
     private fun get(url: String): String {
-        val c = URL(url).openConnection() as HttpURLConnection
-        c.connectTimeout = 10_000
-        c.readTimeout = 15_000
+        val c = app.glass.tresor.net.TorNet.open(url)
         c.setRequestProperty("User-Agent", "Mozilla/5.0 (Android) Wetter")
         try {
             return c.inputStream.bufferedReader().use { it.readText() }

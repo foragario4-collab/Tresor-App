@@ -306,6 +306,9 @@ fun SettingsScreen() {
                     }
                 }
 
+                SectionLabel("Tor-Verbindung")
+                BridgeSection()
+
                 SectionLabel("Updates")
                 UpdateSection()
 
@@ -609,6 +612,65 @@ private fun ProtRow(icon: ImageVector, title: String, sub: String, selected: Boo
 
 
 // ───────────────────────── Updates ─────────────────────────
+
+/** Tor-Brücken: Snowflake oder eigene Brücken, damit der Anbieter Tor nicht erkennt. */
+@Composable
+private fun BridgeSection() {
+    val ctx = LocalContext.current
+    val B = app.glass.tresor.chat.Bridges
+    var mode by remember { mutableStateOf(B.mode(ctx)) }
+    var editing by remember { mutableStateOf(false) }
+    var lines by remember { mutableStateOf(B.customLines(ctx)) }
+    var err by remember { mutableStateOf<String?>(null) }
+
+    fun apply(m: String, custom: String? = null) {
+        B.setMode(ctx, m, custom)
+        mode = m
+        if (app.glass.tresor.chat.ChatService.running) app.glass.tresor.chat.ChatService.reload(ctx)
+        App.toast(
+            when (m) {
+                B.SNOWFLAKE -> "Snowflake an – Tor verbindet neu (kann 1–2 Minuten dauern)"
+                B.CUSTOM -> "Eigene Brücken aktiv – Tor verbindet neu"
+                else -> "Brücken aus – Tor verbindet neu"
+            }
+        )
+    }
+
+    GlassGroup {
+        ChoiceRow(Ic.globe, Color(0xFF6B7280), "Direkt", "Schnellste Verbindung. Dein Anbieter sieht, dass du Tor nutzt – aber nicht wofür.", mode == B.OFF) {
+            if (mode != B.OFF) apply(B.OFF)
+        }
+        ChoiceRow(Ic.flake, Color(0xFF2F80ED), "Snowflake", "Tor sieht aus wie ein Videoanruf. Niemand erkennt, dass du Tor nutzt. Etwas langsamer.", mode == B.SNOWFLAKE) {
+            if (!B.available) App.toast("In dieser Version nicht verfügbar") else if (mode != B.SNOWFLAKE) apply(B.SNOWFLAKE)
+        }
+        ChoiceRow(Ic.shield, Color(0xFF7A4CFF), "Eigene Brücken", "obfs4 oder webtunnel von bridges.torproject.org – für Länder mit starker Zensur.", mode == B.CUSTOM) {
+            if (!B.available) App.toast("In dieser Version nicht verfügbar") else { editing = true; err = null }
+        }
+    }
+    if (editing) {
+        Spacer(Modifier.height(10.dp))
+        Column(Modifier.fillMaxWidth().glass(sq(20)).padding(14.dp)) {
+            Text("Brücken einfügen (eine pro Zeile)", style = G.headline.copy(fontSize = 15.sp))
+            Text("Auf bridges.torproject.org oder per E-Mail an bridges@torproject.org bekommst du Brücken.", style = G.footnote)
+            Spacer(Modifier.height(10.dp))
+            GlassField(lines, { lines = it; err = null }, "obfs4 1.2.3.4:443 … cert=… iat-mode=0", singleLine = false)
+            err?.let { Spacer(Modifier.height(6.dp)); Text(it, style = G.footnote.copy(color = G.red)) }
+            Spacer(Modifier.height(10.dp))
+            Row {
+                PillButton("Abbrechen", modifier = Modifier.weight(1f)) { editing = false; lines = B.customLines(ctx) }
+                Spacer(Modifier.width(10.dp))
+                PillButton("Speichern", primary = true, modifier = Modifier.weight(1f)) {
+                    val e = B.check(lines)
+                    if (e != null) err = e else { editing = false; apply(B.CUSTOM, lines) }
+                }
+            }
+        }
+    }
+    Text(
+        "Gilt für Chat, Anrufe und den Tor-Modus im Browser. Inhalte sind immer Ende-zu-Ende-verschlüsselt – Brücken verstecken nur, dass du Tor benutzt.",
+        style = G.footnote.copy(color = G.faint), modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp)
+    )
+}
 
 @Composable
 private fun UpdateSection() {
