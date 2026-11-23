@@ -141,6 +141,13 @@ private val handbook = listOf(
         "Für jeden Anruf entstehen neue Einmal-Schlüssel – nach dem Auflegen sind sie weg.",
         "Über Tor kommt die Sprache etwa 0,5–2 Sekunden verzögert an. Das ist der Preis für die Anonymität.",
     )),
+    Chapter(Ic.person, "Telefon & Kontakte", listOf(
+        "Auf dem Startbildschirm unten „Telefon“ öffnet die Telefon-App: Favoriten, Zuletzt (alle Anrufe), Kontakte und Sprachnachrichten. Ein Tipp auf das Telefon-Symbol ruft zurück.",
+        "„Kontakte“ zeigt alle Chat-Kontakte von A bis Z, mit Suche. Ganz oben „Meine Karte“ – dein QR-Code zum Hinzufügen.",
+        "Im Kontakt: Nachricht, Anrufen, Sprachnachricht und Stern für Favorit. Favoriten erscheinen im Telefon und im Widget auf dem Startbildschirm.",
+        "Unter „Bearbeiten“ kannst du Spitzname, Geburtstag und eine Notiz eintragen. Das bleibt verschlüsselt nur in deinem Tresor und wird nie verschickt.",
+        "Ohne Telefonnummer: Alle Anrufe laufen über den Tor-Chat. Grün „geprüft“ heißt, ihr habt die Sicherheitsnummer verglichen.",
+    )),
     Chapter(Ic.shield, "Verschlüsselung", listOf(
         "Jede Nachricht hat einen eigenen Einmal-Schlüssel und ist mit AES-256-GCM verschlüsselt. Nur das Handy des Empfängers kann sie lesen.",
         "Wechselnde Schlüssel: Jedes Handy erzeugt täglich einen neuen Empfangsschlüssel und löscht alte nach 30 Tagen. Selbst wer später einen Schlüssel stiehlt, kann alte Nachrichten nicht öffnen.",

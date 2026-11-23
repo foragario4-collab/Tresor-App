@@ -51,6 +51,9 @@ sealed interface Screen {
     data object ChatCode : Screen
     data object ChatTips : Screen
     data object ChatAdd : Screen
+    data object Phone : Screen
+    data object Contacts : Screen
+    data class ContactDetail(val contactId: String) : Screen
     data object Player : Screen
     data object Handbook : Screen
     data class CategorySettings(val kind: FolderKind) : Screen
@@ -303,7 +306,8 @@ object App {
         // Verlässt man sie, verschwinden ausgeblendete Ordner wieder. Für Chat-Konten gilt dasselbe mit dem Chat.
         val inAlbums = nav.stack.any { it is Screen.Albums }
         val inChat = nav.stack.any {
-            it == Screen.Chat || it is Screen.ChatThread || it == Screen.ChatCode || it == Screen.ChatAdd || it == Screen.ChatTips
+            it == Screen.Chat || it is Screen.ChatThread || it == Screen.ChatCode || it == Screen.ChatAdd || it == Screen.ChatTips ||
+                it == Screen.Phone || it == Screen.Contacts || it is Screen.ContactDetail
         }
         val inBrowser = nav.stack.any { it == Screen.Browser }
         val isChat = { f: app.glass.tresor.vault.Folder -> f.kind == app.glass.tresor.vault.FolderKind.CHAT }

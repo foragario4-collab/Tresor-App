@@ -120,7 +120,7 @@ fun HomeScreen() {
     }
     val cal = java.util.Calendar.getInstance().apply { timeInMillis = now }
     val engine = remember(vault) { try { app.glass.tresor.chat.ChatEngine.of(vault) } catch (e: Exception) { null } }
-    val favs = engine?.contacts?.filter { it.accepted && !it.removedByPeer }?.take(2) ?: emptyList()
+    val favs = engine?.contacts?.filter { it.accepted && !it.removedByPeer }?.sortedByDescending { it.fav }?.take(2) ?: emptyList()
 
     Box(Modifier.fillMaxSize().background(WALL)) {
         Wallpaper()
@@ -168,7 +168,7 @@ fun HomeScreen() {
                         { m -> AppIcon(R.drawable.ico_kalender, "Kalender", m, overlay = { CalendarFace(cal) }) { soon = "Kalender" } },
                         { m -> AppIcon(R.drawable.ico_passwoerter, "Passwörter", m) { soon = "Passwörter" } },
                         { m -> AppIcon(R.drawable.ico_browser, "Browser", m) { App.nav.push(Screen.Browser) } },
-                        { m -> AppIcon(R.drawable.ico_kontakte, "Kontakte", m) { App.nav.push(Screen.Chat) } },
+                        { m -> AppIcon(R.drawable.ico_kontakte, "Kontakte", m) { App.nav.push(Screen.Contacts) } },
                         { m -> AppIcon(R.drawable.ico_sprachmemo, "Sprachmemo", m) { soon = "Sprachmemo" } },
                         { m -> AppIcon(R.drawable.ico_einstellungen, "Einstellungen", m) { App.nav.push(Screen.Settings) } },
                     )
@@ -196,7 +196,7 @@ fun HomeScreen() {
                         .padding(horizontal = 16.dp, vertical = 12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    DockIcon(R.drawable.ico_telefon, "Telefon") { App.nav.push(Screen.Chat) }
+                    DockIcon(R.drawable.ico_telefon, "Telefon") { App.nav.push(Screen.Phone) }
                     DockIcon(R.drawable.ico_nachrichten, "Nachrichten") { App.nav.push(Screen.Chat) }
                     DockIcon(R.drawable.ico_kamera, "Kamera", onLong = { camera(true) }) { camera(false) }
                     DockIcon(R.drawable.ico_browser, "Browser") { App.nav.push(Screen.Browser) }

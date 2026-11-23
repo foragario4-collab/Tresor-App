@@ -126,7 +126,7 @@ import java.util.Locale
 
 /** Hält den Chat aktuell, solange ein Chat-Bildschirm offen ist. */
 @Composable
-private fun SyncLoop(engine: ChatEngine, onStatus: (String) -> Unit = {}) {
+fun SyncLoop(engine: ChatEngine, onStatus: (String) -> Unit = {}) {
     LaunchedEffect(engine) {
         while (true) {
             withContext(Dispatchers.IO) { try { engine.sync() } catch (_: Exception) {} }

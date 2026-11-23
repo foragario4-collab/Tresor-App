@@ -63,6 +63,10 @@ data class Contact(
     val removedByPeer: Boolean = false,  // der andere hat mich entfernt
     val peerPre: ChatCrypto.Pre? = null, // aktueller wechselnder Empfangsschlüssel des anderen (Version 2)
     val verified: Boolean = false,       // Sicherheitsnummer verglichen bzw. QR-Code persönlich gescannt
+    val nick: String = "",               // eigene Angaben zum Kontakt – nur für dich, werden nie verschickt
+    val birthday: String = "",
+    val note: String = "",
+    val fav: Boolean = false,            // Favorit im Telefon
 ) {
     /** Solange ihr euch nicht einig seid (oder man entfernt wurde), ruht der Chat. */
     val paused get() = proposalOut != null || proposalIn != null || removedByPeer
@@ -256,6 +260,10 @@ class ChatEngine private constructor(val vault: Vault, val account: String) {
                         it.optBoolean("rm", false),
                         it.optJSONObject("pre")?.let { q -> ChatCrypto.Pre(q.getString("i"), Crypto.unb64(q.getString("k"))) },
                         it.optBoolean("ver", false),
+                        it.optString("nk"),
+                        it.optString("bd"),
+                        it.optString("nt"),
+                        it.optBoolean("fav", false),
                     )
                 )
             }
@@ -290,6 +298,10 @@ class ChatEngine private constructor(val vault: Vault, val account: String) {
             it.proposalIn?.let { p -> j.put("pin", JSONObject().put("id", p.id).put("s", p.settings.toJson())) }
             it.peerPre?.let { q -> j.put("pre", JSONObject().put("i", q.id).put("k", Crypto.b64(q.pub))) }
             if (it.verified) j.put("ver", true)
+            if (it.nick.isNotEmpty()) j.put("nk", it.nick)
+            if (it.birthday.isNotEmpty()) j.put("bd", it.birthday)
+            if (it.note.isNotEmpty()) j.put("nt", it.note)
+            if (it.fav) j.put("fav", true)
             cs.put(j)
         }
         val ms = JSONArray()
@@ -522,6 +534,20 @@ class ChatEngine private constructor(val vault: Vault, val account: String) {
         val plain = j.toString().toByteArray()
         val pre = contacts.firstOrNull { it.pub.contentEquals(pub) }?.peerPre
         return if (pre != null) ChatCrypto.seal2(k, pub, pre, plain) else ChatCrypto.seal(k, pub, plain)
+    }
+
+    /** Eigene Angaben zum Kontakt (Spitzname, Geburtstag, Notiz) – bleiben nur verschlüsselt im Tresor. */
+    @Synchronized
+    fun setContactInfo(c: Contact, nick: String, birthday: String, note: String) {
+        update(c.id) { it.copy(nick = nick.trim().take(40), birthday = birthday.trim().take(20), note = note.trim().take(500)) }
+        save()
+    }
+
+    /** Favorit im Telefon an/aus. */
+    @Synchronized
+    fun setFavorite(c: Contact, on: Boolean) {
+        update(c.id) { it.copy(fav = on) }
+        save()
     }
 
     /** Sicherheitsnummer verglichen → Kontakt als geprüft markieren (oder wieder zurücknehmen). */
