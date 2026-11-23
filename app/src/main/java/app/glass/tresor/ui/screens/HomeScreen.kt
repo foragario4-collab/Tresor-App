@@ -1,5 +1,6 @@
 package app.glass.tresor.ui.screens
 
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import app.glass.tresor.ui.TresorTextField
@@ -41,6 +42,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -165,8 +167,8 @@ fun HomeScreen() {
                 Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(top = 6.dp)) {
                     // Widgets
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        ClockWidget(cal, Modifier.weight(1f))
-                        FavWidget(favs, Modifier.weight(1f))
+                        ClockWidget(cal, Modifier.weight(1f).enterPop(0))
+                        FavWidget(favs, Modifier.weight(1f).enterPop(1))
                     }
                     Spacer(Modifier.height(20.dp))
                     TipCard("home2", "Dein zweites Handy", "Symbol lange drücken = eigener Schlüssel für die Kategorie. Das Schloss oben rechts sperrt sofort. Alles weitere: Einstellungen → Handbuch.")
@@ -186,9 +188,9 @@ fun HomeScreen() {
                         { m -> AppIcon(R.drawable.ico_sprachmemo, "Sprachmemo", m) { App.nav.push(Screen.Memos) } },
                         { m -> AppIcon(R.drawable.ico_einstellungen, "Einstellungen", m) { App.nav.push(Screen.Settings) } },
                     )
-                    apps.chunked(4).forEach { row ->
+                    apps.chunked(4).forEachIndexed { r, row ->
                         Row(Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
-                            row.forEach { cell -> cell(Modifier.weight(1f)) }
+                            row.forEachIndexed { c, cell -> cell(Modifier.weight(1f).enterPop(2 + r * 4 + c)) }
                         }
                     }
                     Spacer(Modifier.height(12.dp))
@@ -210,10 +212,10 @@ fun HomeScreen() {
                         .padding(horizontal = 16.dp, vertical = 12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    DockIcon(R.drawable.ico_telefon, "Telefon") { App.nav.push(Screen.Phone) }
-                    DockIcon(R.drawable.ico_nachrichten, "Nachrichten") { App.nav.push(Screen.Chat) }
-                    DockIcon(R.drawable.ico_kamera, "Kamera", onLong = { camera(true) }) { camera(false) }
-                    DockIcon(R.drawable.ico_browser, "Browser") { App.nav.push(Screen.Browser) }
+                    Box(Modifier.enterPop(14)) { DockIcon(R.drawable.ico_telefon, "Telefon") { App.nav.push(Screen.Phone) } }
+                    Box(Modifier.enterPop(15)) { DockIcon(R.drawable.ico_nachrichten, "Nachrichten") { App.nav.push(Screen.Chat) } }
+                    Box(Modifier.enterPop(16)) { DockIcon(R.drawable.ico_kamera, "Kamera", onLong = { camera(true) }) { camera(false) } }
+                    Box(Modifier.enterPop(17)) { DockIcon(R.drawable.ico_browser, "Browser") { App.nav.push(Screen.Browser) } }
                 }
             }
         }
@@ -333,6 +335,23 @@ private fun AppIcon(
                 modifier = Modifier.padding(horizontal = 2.dp)
             )
         }
+    }
+}
+
+/** Beim Öffnen des Startbildschirms erscheinen Widgets und Symbole nacheinander mit leichtem Federn. */
+private fun Modifier.enterPop(index: Int): Modifier = androidx.compose.ui.composed {
+    val a = remember { androidx.compose.animation.core.Animatable(0f) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(30L + index * 22L)
+        a.animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = 0.62f, stiffness = 340f))
+    }
+    graphicsLayer {
+        val v = a.value
+        alpha = v.coerceIn(0f, 1f)
+        val sc = 0.72f + 0.28f * v
+        scaleX = sc
+        scaleY = sc
+        translationY = (1f - v) * 18.dp.toPx()
     }
 }
 

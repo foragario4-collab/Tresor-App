@@ -129,6 +129,9 @@ private val handbook = listOf(
         "Mehrere Konten (z. B. „Arbeit“): oben auf das Konto tippen. Konten lassen sich wie Ordner schützen und verstecken. Versteckte Konten: unten „Kontakt hinzufügen“ lange drücken und Code eingeben.",
         "Gemeinsame Einstellungen (gelten für beide, der andere muss zustimmen): Löschen für beide, selbstlöschende Nachrichten, Anrufe, Sprachnachrichten.",
         "Sprachnachrichten: bei leerem Textfeld die Mikrofon-Taste.",
+        "Fotos & Videos: links das +. Aus dem Tresor (die neuesten Fotos und Videos aus offenen Ordnern) oder aus der Galerie des Handys. Fotos werden verkleinert und ohne Ortsdaten verschickt, Videos bis 20 MB.",
+        "Große Dateien gehen in Teilen zu 1,5 MB raus. Beim Empfänger steht „kommt an … %“, bis alle Teile da sind. Beide brauchen dafür mindestens Version 1.8.",
+        "Foto oder Video antippen = groß ansehen (Foto mit zwei Fingern zoomen, doppelt tippen). „Im Tresor sichern“ legt eine Kopie in deinen Foto-Ordner.",
     )),
     Chapter(Ic.refresh, "Zustellung ohne Server", listOf(
         "Ist der andere offline, wartet die Nachricht verschlüsselt auf deinem Handy (Uhr-Symbol).",

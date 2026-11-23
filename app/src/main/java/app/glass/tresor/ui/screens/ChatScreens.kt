@@ -1,5 +1,7 @@
 package app.glass.tresor.ui.screens
 
+import kotlinx.coroutines.launch
+import androidx.activity.result.PickVisualMediaRequest
 import app.glass.tresor.ui.TresorTextField
 import android.Manifest
 import android.content.ClipData
@@ -525,7 +527,7 @@ private fun Avatar(name: String) {
     }
 }
 
-private fun timeOf(ts: Long): String {
+internal fun timeOf(ts: Long): String {
     val now = System.currentTimeMillis()
     val f = if (now - ts < 24 * 3600_000L) "HH:mm" else "d. MMM"
     return SimpleDateFormat(f, Locale.GERMANY).format(Date(ts))
@@ -551,6 +553,28 @@ fun ChatThreadScreen(contactId: String) {
     var permFor by remember { mutableStateOf(0) } // 1 = Sprachnachricht, 2 = Anruf
     var settingsSheet by remember { mutableStateOf(false) }
     var draft by remember { mutableStateOf(ChatSettings()) }
+    var attach by remember { mutableStateOf(false) }
+    var viewing by remember { mutableStateOf<Msg?>(null) }
+    var preparing by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    /** Foto/Video vorbereiten (im Hintergrund) und senden. */
+    fun sendPrepared(prep: () -> app.glass.tresor.chat.MediaPrep.Result) {
+        attach = false
+        preparing = true
+        scope.launch {
+            val r = withContext(Dispatchers.IO) { prep() }
+            val c = engine.contacts.firstOrNull { it.id == contactId }
+            val p = r.ok
+            if (p == null) App.toast(r.error ?: "Nicht möglich")
+            else if (c == null || !withContext(Dispatchers.IO) { engine.sendMedia(c, p.kind, p.data, p.w, p.h, p.dur, p.thumb) }) App.toast("Senden nicht möglich")
+            preparing = false
+        }
+    }
+    val galleryPick = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        App.suppressLock = false
+        if (uri != null) sendPrepared { app.glass.tresor.chat.MediaPrep.fromUri(ctx, uri) }
+    }
 
     fun startRec() {
         VoicePlayer.stop()
@@ -641,8 +665,17 @@ fun ChatThreadScreen(contactId: String) {
                         Msg.KIND_CALL -> CallLine(m)
                         Msg.KIND_SYS -> SysLine(m)
                         Msg.KIND_VOICE -> VoiceBubble(m, engine) { toDelete = m }
+                        Msg.KIND_IMAGE, Msg.KIND_VIDEO -> MediaBubble(m, engine, onOpen = { viewing = m }, onLong = { toDelete = m })
                         else -> Bubble(m) { toDelete = m }
                     }
+                }
+            }
+            IncomingMediaPill(engine, contactId)
+            if (preparing) Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.Center) {
+                Row(Modifier.glass(Pill).padding(horizontal = 14.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+                    androidx.compose.material3.CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Wird verschlüsselt …", style = G.footnote.copy(color = Color.White))
                 }
             }
             PauseBanner(engine, contact)
@@ -679,6 +712,13 @@ fun ChatThreadScreen(contactId: String) {
                         Icon(Ic.send, "Senden", tint = Color.White, modifier = Modifier.size(22.dp))
                     }
                 } else {
+                    // Foto oder Video anhängen
+                    Box(
+                        Modifier.size(48.dp).pressable(CircleShape, scaleTo = 0.9f, highlight = 0f) { attach = true }
+                            .glass(CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) { Icon(Ic.plus, "Foto oder Video senden", tint = Color.White, modifier = Modifier.size(22.dp)) }
+                    Spacer(Modifier.width(8.dp))
                     Box(
                         Modifier.weight(1f).heightIn(min = 48.dp).glass(sq(24)).padding(horizontal = 16.dp, vertical = 13.dp)
                     ) {
@@ -797,9 +837,26 @@ fun ChatThreadScreen(contactId: String) {
             visible = toDelete != null, title = "Nachricht löschen?", text = "Nur auf deinem Handy.",
             confirm = "Löschen", onDismiss = { toDelete = null }
         ) {
-            toDelete?.let { engine.deleteMessage(it) }
+            toDelete?.let { ChatMediaCache.clear(); engine.deleteMessage(it) }
             toDelete = null
         }
+        Sheet(attach, { attach = false }) {
+            SheetHeader(Ic.photo, "Foto oder Video senden", "Fotos werden verkleinert und ohne Ortsdaten verschickt. Videos bis 20 MB. Alles Ende-zu-Ende verschlüsselt über Tor.")
+            Text("AUS DEM TRESOR", style = G.caption)
+            Spacer(Modifier.height(8.dp))
+            VaultMediaGrid(vault) { fid, item -> sendPrepared { app.glass.tresor.chat.MediaPrep.fromVault(vault, fid, item) } }
+            Spacer(Modifier.height(14.dp))
+            PillButton("Aus der Galerie des Handys", icon = Ic.photo, modifier = Modifier.fillMaxWidth()) {
+                App.suppressLock = true
+                try {
+                    galleryPick.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
+                } catch (e: Exception) {
+                    App.suppressLock = false
+                    App.toast("Galerie nicht verfügbar")
+                }
+            }
+        }
+        viewing?.let { vm -> MediaViewer(vm, engine) { viewing = null } }
     }
 }
 

@@ -80,10 +80,16 @@ data class Msg(
     val ts: Long,
     val state: Int,          // 0 = wartet, 1 = zugestellt, 2 = empfangen
     val kind: String = KIND_TEXT,
-    val dur: Long = 0,       // Länge der Sprachnachricht in ms
+    val dur: Long = 0,       // Länge der Sprachnachricht / des Videos in ms
+    val w: Int = 0,          // Bild-/Videogröße (für das Seitenverhältnis im Verlauf)
+    val h: Int = 0,
 ) {
+    val isMedia get() = kind == KIND_IMAGE || kind == KIND_VIDEO
+
     companion object {
         const val KIND_TEXT = "text"
+        const val KIND_IMAGE = "image"
+        const val KIND_VIDEO = "video"
         const val KIND_VOICE = "voice"
         const val KIND_CALL = "call"
         const val KIND_SYS = "sys"
@@ -124,6 +130,12 @@ class ChatEngine private constructor(val vault: Vault, val account: String) {
         /** Sprachnachrichten: höchstens 5 Minuten / 3 MB. */
         const val MAX_VOICE_MS = 5 * 60_000L
         const val MAX_VOICE_BYTES = 3 * 1024 * 1024
+        /** Fotos und Videos: höchstens 20 MB, verschickt in Teilen zu 1,5 MB (jedes Paket bleibt klein). */
+        const val MAX_MEDIA_BYTES = 20 * 1024 * 1024
+        const val MEDIA_CHUNK = 1_500_000
+        const val MAX_PARTS = (MAX_MEDIA_BYTES + MEDIA_CHUNK - 1) / MEDIA_CHUNK
+        /** Unvollständige empfangene Medien werden nach 7 Tagen verworfen. */
+        const val PARTIAL_KEEP_MS = 7 * 24 * 3600_000L
         const val MAIN = "main"
 
         /** Neuer eigener Empfangsschlüssel nach so langer Zeit (nur während der Tresor offen ist). */
@@ -270,7 +282,18 @@ class ChatEngine private constructor(val vault: Vault, val account: String) {
             val ms = o.optJSONArray("msgs") ?: JSONArray()
             messages.clear()
             for (i in 0 until ms.length()) ms.getJSONObject(i).let {
-                messages.add(Msg(it.getString("id"), it.getString("c"), it.getBoolean("m"), it.getString("t"), it.getLong("ts"), it.getInt("s"), it.optString("k", Msg.KIND_TEXT), it.optLong("d")))
+                messages.add(Msg(it.getString("id"), it.getString("c"), it.getBoolean("m"), it.getString("t"), it.getLong("ts"), it.getInt("s"), it.optString("k", Msg.KIND_TEXT), it.optLong("d"), it.optInt("w", 0), it.optInt("h", 0)))
+            }
+            partials.clear()
+            o.optJSONArray("parts")?.let { a ->
+                for (i in 0 until a.length()) a.getJSONObject(i).let { q ->
+                    val got = HashSet<Int>()
+                    q.optJSONArray("g")?.let { g -> for (j in 0 until g.length()) got.add(g.getInt(j)) }
+                    partials[q.getString("id")] = Partial(
+                        q.getString("id"), q.getString("c"), q.getInt("of"), got, q.getString("k"),
+                        q.optInt("w", 0), q.optInt("h", 0), q.optLong("d"), q.optLong("ts"), q.optLong("cr"), q.optLong("sz")
+                    )
+                }
             }
             blocked.clear()
             o.optJSONArray("blocked")?.let { a -> for (i in 0 until a.length()) blocked.add(a.getString(i)) }
@@ -306,13 +329,25 @@ class ChatEngine private constructor(val vault: Vault, val account: String) {
         }
         val ms = JSONArray()
         messages.toList().forEach {
-            ms.put(JSONObject().put("id", it.id).put("c", it.contact).put("m", it.mine).put("t", it.text).put("ts", it.ts).put("s", it.state).put("k", it.kind).put("d", it.dur))
+            val j = JSONObject().put("id", it.id).put("c", it.contact).put("m", it.mine).put("t", it.text).put("ts", it.ts).put("s", it.state).put("k", it.kind).put("d", it.dur)
+            if (it.w > 0) j.put("w", it.w)
+            if (it.h > 0) j.put("h", it.h)
+            ms.put(j)
+        }
+        val pa = JSONArray()
+        partials.values.forEach { q ->
+            val g = JSONArray()
+            q.got.forEach { g.put(it) }
+            pa.put(
+                JSONObject().put("id", q.id).put("c", q.contact).put("of", q.of).put("g", g).put("k", q.kind)
+                    .put("w", q.w).put("h", q.h).put("d", q.dur).put("ts", q.ts).put("cr", q.created).put("sz", q.size)
+            )
         }
         val bl = JSONArray()
         blocked.forEach { bl.put(it) }
         val pr = JSONArray()
         myPres.forEach { q -> pr.put(JSONObject().put("i", q.id).put("s", Crypto.b64(q.priv)).put("p", Crypto.b64(q.pub)).put("c", q.created).put("r", q.retired)) }
-        o.put("contacts", cs).put("msgs", ms).put("blocked", bl).put("pres", pr)
+        o.put("contacts", cs).put("msgs", ms).put("blocked", bl).put("pres", pr).put("parts", pa)
         writeData("chat", o.toString().toByteArray())
         // Für den Hintergrund-Dienst: wessen Pakete sofort verworfen werden (ohne Vibration)
         ChatSpool.setBlocked(ctx, spool, blocked.toSet())
@@ -345,9 +380,9 @@ class ChatEngine private constructor(val vault: Vault, val account: String) {
     }
 
     private fun drop(contactId: String) {
-        messages.filter { it.contact == contactId && it.mine && it.state == 0 }.forEach { ChatSpool.cancelOutgoing(ctx, spool, it.id) }
-        messages.filter { it.contact == contactId && it.kind == Msg.KIND_VOICE }.forEach { deleteData(voiceBlob(it.id)) }
+        messages.filter { it.contact == contactId }.forEach { forgetData(it) }
         messages.removeAll { it.contact == contactId }
+        partials.values.filter { it.contact == contactId }.toList().forEach { dropPartial(it) }
     }
 
     /** Wird regelmäßig aufgerufen, solange der Tresor offen ist. */
@@ -366,6 +401,9 @@ class ChatEngine private constructor(val vault: Vault, val account: String) {
             for (i in messages.indices) {
                 val m = messages[i]
                 if (m.mine && m.state == 0 && m.id in sent) messages[i] = m.copy(state = 1)
+                // Foto/Video: zugestellt, sobald alle Teile angekommen sind
+                else if (m.mine && m.state == 0 && m.isMedia && sent.any { it.startsWith(m.id + "_p") } && !ChatSpool.hasOutgoing(ctx, spool, m.id + "_p"))
+                    messages[i] = m.copy(state = 1)
             }
             changed = true
         }
@@ -406,6 +444,51 @@ class ChatEngine private constructor(val vault: Vault, val account: String) {
                             messages.add(m); newest = m
                             changed = true
                         }
+                    }
+                    "media" -> {
+                        if (from == null || !from.accepted) continue
+                        val id = p.getString("id")
+                        if (id.length > 40 || messages.any { it.id == id }) continue
+                        val of = p.getInt("of")
+                        val n = p.getInt("n")
+                        val kind = p.getString("k")
+                        if (of !in 1..MAX_PARTS || n !in 0 until of || (kind != Msg.KIND_IMAGE && kind != Msg.KIND_VIDEO)) continue
+                        val part = Crypto.unb64(p.getString("a"))
+                        if (part.isEmpty() || part.size > MEDIA_CHUNK) continue
+                        val q = partials.getOrPut(id) {
+                            Partial(
+                                id, from.id, of, HashSet(), kind, p.optInt("w", 0).coerceIn(0, 20000), p.optInt("h", 0).coerceIn(0, 20000),
+                                p.optLong("d").coerceIn(0L, 24 * 3600_000L), p.optLong("ts", System.currentTimeMillis()), System.currentTimeMillis(),
+                                p.optLong("sz").coerceIn(0L, MAX_MEDIA_BYTES.toLong())
+                            )
+                        }
+                        if (q.contact != from.id || q.of != of) continue
+                        if (n !in q.got) {
+                            writeData(partBlob(id, n), part)
+                            q.got.add(n)
+                        }
+                        p.optString("th").takeIf { it.isNotEmpty() }?.let { th ->
+                            val tb = Crypto.unb64(th)
+                            if (tb.size in 1..200_000) writeData(thumbBlob(id), tb)
+                        }
+                        if (q.got.size == q.of) {
+                            // Alle Teile da → zusammensetzen
+                            val all = java.io.ByteArrayOutputStream()
+                            var ok = true
+                            for (i in 0 until q.of) {
+                                val b = readData(partBlob(id, i))
+                                if (b == null) { ok = false; break }
+                                all.write(b)
+                            }
+                            val data = all.toByteArray()
+                            if (ok && data.size <= MAX_MEDIA_BYTES && (q.size == 0L || data.size.toLong() == q.size)) {
+                                writeData(mediaBlob(id), data)
+                                val m = Msg(id, from.id, false, if (kind == Msg.KIND_IMAGE) "Foto" else "Video", q.ts, 2, kind, q.dur, q.w, q.h)
+                                messages.add(m); newest = m
+                            }
+                            dropPartial(q)
+                        }
+                        changed = true
                     }
                     "msg" -> {
                         if (from == null) continue
@@ -475,6 +558,7 @@ class ChatEngine private constructor(val vault: Vault, val account: String) {
             }
         }
         if (pruneExpired()) changed = true
+        partials.values.filter { System.currentTimeMillis() - it.created > PARTIAL_KEEP_MS }.toList().forEach { dropPartial(it); changed = true }
         if (rotatePre()) changed = true
         if (changed) save()
         newest?.let {
@@ -566,8 +650,7 @@ class ChatEngine private constructor(val vault: Vault, val account: String) {
         }
         if (expired.isEmpty()) return false
         expired.forEach { m ->
-            if (m.mine && m.state == 0) ChatSpool.cancelOutgoing(ctx, spool, m.id)
-            if (m.kind == Msg.KIND_VOICE) deleteData(voiceBlob(m.id))
+            forgetData(m)
         }
         val ids = expired.map { it.id }.toSet()
         messages.removeAll { it.id in ids }
@@ -726,8 +809,7 @@ class ChatEngine private constructor(val vault: Vault, val account: String) {
 
     @Synchronized
     fun deleteMessage(m: Msg) {
-        if (m.mine && m.state == 0) ChatSpool.cancelOutgoing(ctx, spool, m.id)
-        if (m.kind == Msg.KIND_VOICE) deleteData(voiceBlob(m.id))
+        forgetData(m)
         messages.removeAll { it.id == m.id }
         save()
     }
@@ -757,6 +839,74 @@ class ChatEngine private constructor(val vault: Vault, val account: String) {
     }
 
     fun voiceData(m: Msg): ByteArray? = readData(voiceBlob(m.id))
+
+    // ───────────────────────── Fotos & Videos ─────────────────────────
+
+    /** Empfang in Teilen: welche Teile schon da sind (bleibt verschlüsselt im Tresor gespeichert). */
+    class Partial(
+        val id: String, val contact: String, val of: Int, val got: MutableSet<Int>, val kind: String,
+        val w: Int, val h: Int, val dur: Long, val ts: Long, val created: Long, val size: Long,
+    )
+
+    private val partials = LinkedHashMap<String, Partial>()
+
+    private fun mediaBlob(id: String) = "cm_$id"
+    private fun thumbBlob(id: String) = "cmt_$id"
+    private fun partBlob(id: String, n: Int) = "cmp_${id}_$n"
+
+    private fun dropPartial(q: Partial) {
+        for (i in 0 until q.of) deleteData(partBlob(q.id, i))
+        if (messages.none { it.id == q.id }) deleteData(thumbBlob(q.id))
+        partials.remove(q.id)
+    }
+
+    /** Alles zu einer Nachricht entfernen: wartende Pakete, Ton, Foto, Video, Vorschau. */
+    private fun forgetData(m: Msg) {
+        if (m.mine && m.state == 0) {
+            ChatSpool.cancelOutgoing(ctx, spool, m.id)
+            if (m.isMedia) ChatSpool.cancelPrefix(ctx, spool, m.id + "_p")
+        }
+        if (m.kind == Msg.KIND_VOICE) deleteData(voiceBlob(m.id))
+        if (m.isMedia) { deleteData(mediaBlob(m.id)); deleteData(thumbBlob(m.id)) }
+    }
+
+    /**
+     * Foto oder Video senden. Wird in Teilen zu je 1,5 MB verschickt, jeder Teil einzeln verschlüsselt
+     * und aufgefüllt. Die eigene Kopie liegt nur verschlüsselt im Tresor.
+     */
+    @Synchronized
+    fun sendMedia(c: Contact, kind: String, data: ByteArray, w: Int, h: Int, durMs: Long, thumb: ByteArray?): Boolean {
+        keys ?: return false
+        val cur = contacts.getOrNull(idx(c.id)) ?: return false
+        if (cur.paused || !cur.accepted) return false
+        if (kind != Msg.KIND_IMAGE && kind != Msg.KIND_VIDEO) return false
+        if (data.isEmpty() || data.size > MAX_MEDIA_BYTES) return false
+        val id = newId()
+        val ts = System.currentTimeMillis()
+        writeData(mediaBlob(id), data)
+        val th = thumb?.takeIf { it.size in 1..200_000 }
+        th?.let { writeData(thumbBlob(id), it) }
+        val of = (data.size + MEDIA_CHUNK - 1) / MEDIA_CHUNK
+        for (n in 0 until of) {
+            val part = data.copyOfRange(n * MEDIA_CHUNK, minOf(data.size, (n + 1) * MEDIA_CHUNK))
+            val j = JSONObject().put("t", "media").put("id", id).put("n", n).put("of", of).put("k", kind)
+                .put("w", w).put("h", h).put("d", durMs).put("ts", ts).put("sz", data.size.toLong())
+                .put("a", Crypto.b64(part))
+            if (n == 0 && th != null) j.put("th", Crypto.b64(th))
+            ChatSpool.putOutbox(ctx, spool, "${id}_p$n", cur.onion, sealFor(cur.pub, j))
+        }
+        messages.add(Msg(id, cur.id, true, if (kind == Msg.KIND_IMAGE) "Foto" else "Video", ts, 0, kind, durMs, w, h))
+        save()
+        ChatService.kick(ctx)
+        return true
+    }
+
+    fun mediaData(m: Msg): ByteArray? = if (m.isMedia) readData(mediaBlob(m.id)) else null
+    fun mediaThumb(m: Msg): ByteArray? = if (m.isMedia) readData(thumbBlob(m.id)) else null
+
+    /** Fortschritt gerade empfangener Fotos/Videos eines Kontakts (Art, 0..1) – für die Anzeige „wird geladen“. */
+    fun incoming(contactId: String): List<Pair<String, Float>> =
+        partials.values.filter { it.contact == contactId }.map { it.kind to it.got.size.toFloat() / it.of }
 
     // ───────────────────────── Anrufe ─────────────────────────
 

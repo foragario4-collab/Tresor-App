@@ -380,6 +380,7 @@ object App {
         app.glass.tresor.chat.ChatEngine.close()
         vaults.forEach { it.lock() }
         ThumbCache.clearAll()
+        app.glass.tresor.ui.screens.ChatMediaCache.clear()
         clearShareCache()
         app.glass.tresor.browser.BrowserData.clearAll()
         vault = null
@@ -486,6 +487,7 @@ object App {
     fun panicWipe(code: CharArray) {
         vaults.forEach { it.lock() }
         ThumbCache.clearAll()
+        app.glass.tresor.ui.screens.ChatMediaCache.clear()
         app.glass.tresor.chat.ChatService.stop(ctx)
         crypticShred()
         genuine = checkSignature()
@@ -527,6 +529,7 @@ object App {
         removePanicCode()
         removeAllVaultPanicCodes()
         ThumbCache.clearAll()
+        app.glass.tresor.ui.screens.ChatMediaCache.clear()
         clearShareCache(force = true)
         prefs.edit().putInt("failed", 0).putLong("lockout", 0L).apply()
         vault = null

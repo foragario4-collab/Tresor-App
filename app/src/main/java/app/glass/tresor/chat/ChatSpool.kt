@@ -119,6 +119,15 @@ object ChatSpool {
         File(File(slotDir(ctx, slot), "outbox"), "$id.bin").delete()
     }
 
+    /** Alle wartenden Teile einer Nachricht zurückziehen (Fotos/Videos werden in Teilen verschickt). */
+    fun cancelPrefix(ctx: Context, slot: String, prefix: String) {
+        (File(slotDir(ctx, slot), "outbox").listFiles() ?: return).filter { it.name.startsWith(prefix) }.forEach { it.delete() }
+    }
+
+    /** Wartet noch ein Teil mit diesem Anfang auf die Zustellung? */
+    fun hasOutgoing(ctx: Context, slot: String, prefix: String): Boolean =
+        (File(slotDir(ctx, slot), "outbox").listFiles() ?: emptyArray()).any { it.name.startsWith(prefix) }
+
     /** Liest und entfernt alle Zustellbestätigungen. */
     fun drainSent(ctx: Context, slot: String): Set<String> {
         val files = File(slotDir(ctx, slot), "sent").listFiles() ?: return emptySet()

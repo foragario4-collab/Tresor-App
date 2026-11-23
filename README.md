@@ -107,6 +107,8 @@ Damit es im Hintergrund zuverlässig läuft: Chat → Tipps → Akku-Optimierung
 
 **Banner:** Kommt eine Nachricht, während der Tresor offen ist, erscheint oben ein Banner. Tippen öffnet den Chat.
 
+**Fotos & Videos:** Im Gespräch links auf + tippen: aus dem Tresor oder aus der Galerie (System-Fotoauswahl, keine Berechtigung nötig). Fotos werden auf 1600 px verkleinert und neu gespeichert – Ortsdaten und Kamera-Infos fallen weg. Videos bis 20 MB. Alles wird in Teilen zu 1,5 MB verschickt, jeder Teil einzeln Ende-zu-Ende verschlüsselt und aufgefüllt; der Empfänger setzt sie zusammen. Beide Seiten brauchen mindestens Version 1.8. „Im Tresor sichern“ legt eine Kopie in einen Foto-Ordner.
+
 **Sprachnachrichten:** Im Gespräch bei leerem Textfeld die Mikrofon-Taste tippen, sprechen, auf Senden tippen (bis 5 Minuten, Opus). Die Aufnahme liegt nur kurz im privaten App-Speicher und wird danach überschrieben und gelöscht. Danach existiert sie nur verschlüsselt im Tresor und wird direkt aus dem Speicher abgespielt.
 
 **Anrufe:** Im Gespräch oben auf das Telefon tippen. Die Verbindung läuft direkt von Handy zu Handy über Tor, ohne Server.
