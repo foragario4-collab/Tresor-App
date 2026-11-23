@@ -1,6 +1,7 @@
 package app.glass.tresor.ui.screens
 
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.composed
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import app.glass.tresor.ui.TresorTextField
@@ -339,7 +340,7 @@ private fun AppIcon(
 }
 
 /** Beim Öffnen des Startbildschirms erscheinen Widgets und Symbole nacheinander mit leichtem Federn. */
-private fun Modifier.enterPop(index: Int): Modifier = androidx.compose.ui.composed {
+private fun Modifier.enterPop(index: Int): Modifier = composed {
     val a = remember { androidx.compose.animation.core.Animatable(0f) }
     LaunchedEffect(Unit) {
         kotlinx.coroutines.delay(30L + index * 22L)
