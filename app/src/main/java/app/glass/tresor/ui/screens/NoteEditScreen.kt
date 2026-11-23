@@ -1,5 +1,6 @@
 package app.glass.tresor.ui.screens
 
+import app.glass.tresor.ui.TresorTextField
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -99,18 +100,18 @@ fun NoteEditScreen(fid: String, iid: String?) {
                     }
                     Box {
                         if (title.isEmpty()) Text("Titel", style = G.largeTitle.copy(fontSize = 28.sp, color = G.faint))
-                        BasicTextField(
+                        TresorTextField(
                             value = title, onValueChange = { title = it; dirty = true },
-                            textStyle = G.largeTitle.copy(fontSize = 28.sp), cursorBrush = SolidColor(G.accentText),
+                            textStyle = G.largeTitle.copy(fontSize = 28.sp),
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
                     Spacer(Modifier.height(12.dp))
                     Box {
                         if (body.isEmpty()) Text("Schreib etwas …", style = G.body.copy(color = G.faint))
-                        BasicTextField(
+                        TresorTextField(
                             value = body, onValueChange = { body = it; dirty = true },
-                            textStyle = G.body.copy(lineHeight = 25.sp), cursorBrush = SolidColor(G.accentText),
+                            textStyle = G.body.copy(lineHeight = 25.sp),
                             modifier = Modifier.fillMaxWidth().heightIn(min = 420.dp)
                         )
                     }

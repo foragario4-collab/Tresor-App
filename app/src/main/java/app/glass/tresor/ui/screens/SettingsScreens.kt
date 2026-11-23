@@ -285,9 +285,8 @@ fun SettingsScreen() {
                     SettingRow("Sperre beim Umdrehen", "Display nach unten legen sperrt sofort", showDivider = true) {
                         GlassSwitch(App.flipLock, "Umdrehen") { App.changeFlipLock(it) }
                     }
-                    var secureKb by remember { mutableStateOf(App.prefs.getBoolean("secureKb", true)) }
-                    SettingRow("Eigene Tastatur", "Codes und Passwörter über die eingebaute Tastatur – keine fremde Tastatur liest mit", showDivider = true) {
-                        GlassSwitch(secureKb, "Eigene Tastatur") { secureKb = it; App.prefs.edit().putBoolean("secureKb", it).apply() }
+                    SettingRow("Eigene Tastatur", "Alle Eingaben im Tresor über die Tresor-Tastatur – keine fremde Tastatur-App liest mit", showDivider = true) {
+                        GlassSwitch(app.glass.tresor.ui.TresorKb.enabled, "Eigene Tastatur") { app.glass.tresor.ui.TresorKb.turn(it) }
                     }
                     var musicBg by remember { mutableStateOf(App.prefs.getBoolean("musicBackground", false)) }
                     SettingRow("Musik im Hintergrund", "Aktuelles Lied läuft weiter, auch wenn der Tresor sperrt", showDivider = true) {

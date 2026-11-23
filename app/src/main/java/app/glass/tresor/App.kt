@@ -205,6 +205,7 @@ object App {
         lockMode = prefs.getString("lockMode", "now") ?: "now"
         appHidden = prefs.getBoolean("appHidden", false)
         app.glass.tresor.browser.BrowserTor.init()
+        app.glass.tresor.ui.TresorKb.init()
         wipeAfter10 = prefs.getBoolean("wipe10", false)
         disguise = Disguise.entries.firstOrNull { it.name == prefs.getString("disguiseName", null) } ?: Disguise.TRESOR
         clearShareCache(force = true)

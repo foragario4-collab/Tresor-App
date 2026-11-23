@@ -27,6 +27,7 @@ Nach dem Entsperren sieht der Tresor aus wie ein eigenes Handy:
 - Kamera-Symbol: tippen = Foto, lange drücken = Video. Das Schloss oben rechts sperrt sofort.
 - **Telefon-App** (Dock): Favoriten, Zuletzt (alle Anrufe), Kontakte, Sprachnachrichten – alles über den Tor-Chat, ohne Telefonnummer.
 - **Kontakte-App**: A–Z mit Suche, „Meine Karte“ (QR-Code), Kontakt mit Nachricht/Anrufen/Sprache/Favorit, eigenem Spitznamen, Geburtstag und Notiz (nur verschlüsselt bei dir, wird nie verschickt) und Sicherheitsnummer.
+- **Kontrollzentrum** (oben nach unten wischen): Browser über Tor, Snowflake, Chat im Hintergrund, Kamera, Musik, Bewegungs-/Umdreh-Sperre, eigene Tastatur, Bewegungs-Empfindlichkeit, Jetzt sperren.
 - **Sperrbildschirm** wie am iPhone: Datum, große Uhrzeit, runde Glastasten mit Buchstaben, Fingerabdruck unten links.
 - Kalender, Passwörter und Sprachmemo sind als Symbole schon da und kommen mit den nächsten Updates.
 
@@ -152,7 +153,7 @@ Werbeblocker: blockiert Werbung und Tracker mit EasyList und EasyPrivacy (diesel
 ## Eigene Kamera und eigene Tastatur
 
 - Fotos und Videos aus der eingebauten Kamera landen direkt verschlüsselt im Tresor, nie in der Galerie. Ortsdaten werden entfernt.
-- Codes und Passwörter werden über die eingebaute Tastatur getippt, damit keine fremde Tastatur-App mitlesen kann (abschaltbar).
+- **Tresor-Tastatur:** Alle Eingaben im Tresor (Chat, Notizen, Suche, Adresszeile, Codes, Passwörter) laufen über die eingebaute Tastatur. Die System-Tastatur wird für diese Felder gar nicht gestartet – keine fremde Tastatur-App liest mit. Umlaute per langem Druck, Ziffern/Zeichen, Emojis. In der Tarnung erscheint bewusst die normale Tastatur. Abschaltbar.
 
 ## Sperren
 

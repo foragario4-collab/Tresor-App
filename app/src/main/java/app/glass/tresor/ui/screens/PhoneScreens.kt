@@ -1,5 +1,6 @@
 package app.glass.tresor.ui.screens
 
+import app.glass.tresor.ui.TresorTextField
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -381,9 +382,9 @@ fun ContactsScreen() {
                     Spacer(Modifier.width(8.dp))
                     Box(Modifier.weight(1f)) {
                         if (query.isEmpty()) Text("Suchen", style = G.body.copy(fontSize = 16.sp, color = G.faint))
-                        BasicTextField(
+                        TresorTextField(
                             value = query, onValueChange = { query = it.take(40) }, singleLine = true,
-                            textStyle = G.body.copy(fontSize = 16.sp), cursorBrush = SolidColor(G.accentText),
+                            textStyle = G.body.copy(fontSize = 16.sp),
                             modifier = Modifier.fillMaxWidth()
                         )
                     }

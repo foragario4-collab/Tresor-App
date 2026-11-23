@@ -1,5 +1,6 @@
 package app.glass.tresor.ui.screens
 
+import app.glass.tresor.ui.TresorTextField
 import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -682,9 +683,10 @@ fun ChatThreadScreen(contactId: String) {
                         Modifier.weight(1f).heightIn(min = 48.dp).glass(sq(24)).padding(horizontal = 16.dp, vertical = 13.dp)
                     ) {
                         if (text.isEmpty()) Text("Nachricht", style = G.body.copy(color = G.faint))
-                        BasicTextField(
+                        TresorTextField(
                             value = text, onValueChange = { text = it.take(5000) },
-                            textStyle = G.body, cursorBrush = SolidColor(G.accentText), maxLines = 6,
+                            textStyle = G.body, maxLines = 6,
+                            actionLabel = "Senden", onAction = { if (text.isNotBlank() && engine.send(contact, text)) text = "" },
                             modifier = Modifier.fillMaxWidth()
                         )
                     }

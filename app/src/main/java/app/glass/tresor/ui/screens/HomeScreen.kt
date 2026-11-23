@@ -1,5 +1,8 @@
 package app.glass.tresor.ui.screens
 
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import app.glass.tresor.ui.TresorTextField
 import androidx.compose.foundation.border
 import app.glass.tresor.ui.Sheet
 import app.glass.tresor.ui.SheetHeader
@@ -98,6 +101,7 @@ fun HomeScreen() {
     var query by remember { mutableStateOf("") }
     var searching by remember { mutableStateOf(false) }
     var soon by remember { mutableStateOf<String?>(null) }
+    var control by remember { mutableStateOf(false) }
 
     val visible = vault.folders.filter { !it.hidden && it.id in vault.unlockedFolders }
     val defaultMedia = visible.firstOrNull { it.kind == FolderKind.MEDIA && !it.isProtected }?.id
@@ -127,9 +131,20 @@ fun HomeScreen() {
         Column(
             Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 20.dp)
         ) {
-            // Oben rechts: sofort sperren
-            Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            // Oben rechts: Kontrollzentrum (auch: hier nach unten wischen) und sofort sperren
+            Row(
+                Modifier.fillMaxWidth().padding(top = 8.dp).pointerInput(Unit) {
+                    var total = 0f
+                    detectVerticalDragGestures(
+                        onDragStart = { total = 0f },
+                        onDragEnd = { if (total > 40.dp.toPx()) control = true },
+                    ) { change, dy -> total += dy; change.consume() }
+                },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Spacer(Modifier.weight(1f))
+                GlassIconButton(Ic.sliders, "Kontrollzentrum") { control = true }
+                Spacer(Modifier.width(10.dp))
                 GlassIconButton(Ic.lock, "Jetzt sperren") { App.lock() }
             }
             if (searching) {
@@ -211,6 +226,17 @@ fun HomeScreen() {
             unlockCat = null
             if (t != null) App.nav.push(t)
         }
+
+        ControlCenter(
+            visible = control,
+            onClose = { control = false },
+            onCamera = { control = false; camera(false) },
+            onMusic = {
+                control = false
+                if (app.glass.tresor.music.MusicPlayer.active) App.nav.push(Screen.Player)
+                else openCat(FolderKind.MUSIC, Screen.Albums(FolderKind.MUSIC, null))
+            },
+        )
 
         Sheet(soon != null, { soon = null }) {
             SheetHeader(Ic.info, soon ?: "", "Diese App kommt mit einem der nächsten Updates – verschlüsselt im Tresor, wie alles hier.")
@@ -416,9 +442,9 @@ private fun SearchField(query: String, onChange: (String) -> Unit) {
         Spacer(Modifier.width(8.dp))
         Box(Modifier.weight(1f)) {
             if (query.isEmpty()) Text("Im Tresor suchen", style = G.body.copy(fontSize = 16.sp, color = G.faint))
-            BasicTextField(
+            TresorTextField(
                 value = query, onValueChange = onChange, singleLine = true,
-                textStyle = G.body.copy(fontSize = 16.sp), cursorBrush = SolidColor(G.accentText),
+                textStyle = G.body.copy(fontSize = 16.sp),
                 modifier = Modifier.fillMaxWidth()
             )
         }

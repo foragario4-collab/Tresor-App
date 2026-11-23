@@ -169,9 +169,20 @@ private val handbook = listOf(
         "Geheime Bereiche: oben auf den Bereichsnamen tippen → „Neuer Bereich“, mit „Schutz & Verstecken“ sichern. Lange auf den Namen drücken holt versteckte Bereiche hervor.",
         "Downloads landen verschlüsselt in Dateien → Downloads.",
     )),
-    Chapter(Ic.keyboard, "Eigene Tastatur & Code-Eingabe", listOf(
-        "Codes und Passwörter tippst du über die eingebaute Tastatur – keine fremde Tastatur-App kann mitlesen. Abschaltbar unter „Sichere Tastatur“.",
+    Chapter(Ic.keyboard, "Tresor-Tastatur & Code-Eingabe", listOf(
+        "Alles, was du im Tresor tippst – Chat, Notizen, Suche, Adresszeile, Namen, Codes und Passwörter – geht über die eingebaute Tresor-Tastatur. Keine fremde Tastatur-App bekommt etwas mit: sie lernt nichts, speichert nichts, sendet nichts.",
+        "Buchstaben lange drücken: a → ä, o → ö, u → ü, s → ß, e → €. Umschalttaste zweimal tippen = Feststelltaste. Zwei Leerzeichen = Punkt. Löschtaste halten löscht weiter.",
+        "„123“ für Ziffern und Zeichen, das Smiley für Emojis. Der Pfeil oben rechts oder „Zurück“ schließt die Tastatur. Cursor setzen und Markieren geht wie gewohnt im Feld.",
+        "In der Tarnung (z. B. Notizen, Kalender, Browser) erscheint die normale Handy-Tastatur – damit nichts auf den Tresor hinweist. Webseiten im Browser nutzen ebenfalls die normale Tastatur.",
+        "Abschaltbar unter Einstellungen → Schutz → „Eigene Tastatur“ oder im Kontrollzentrum.",
         "Bei versteckten Ordnern erscheint ein Ziffernblock wie am iPhone. Unten links: Fingerabdruck. „Code mit Buchstaben“ wechselt zur vollen Tastatur.",
+    )),
+    Chapter(Ic.sliders, "Kontrollzentrum", listOf(
+        "Auf dem Startbildschirm oben nach unten wischen oder das Regler-Symbol neben dem Schloss tippen.",
+        "Oben links: Browser über Tor, Snowflake, Chat im Hintergrund und Kamera. Daneben die Musik mit Zurück, Abspielen und Weiter.",
+        "Schutz-Schalter: Sperre bei Bewegung, Sperre beim Umdrehen, eigene Tastatur. „App versteckt“ führt in die Einstellungen, weil dafür dein Telefoncode geprüft wird.",
+        "Der große Regler stellt die Bewegungs-Empfindlichkeit ein (ziehen oder tippen). „Jetzt sperren“ sperrt sofort.",
+        "Schließen: nach oben wischen, auf eine leere Stelle tippen oder „Zurück“.",
     )),
     Chapter(Ic.trash, "Notfall-Löschcode", listOf(
         "Universeller Löschcode: löscht alle Tresore – überall eingegeben, wo ein Code verlangt wird, auch in den Tarn-Apps.",

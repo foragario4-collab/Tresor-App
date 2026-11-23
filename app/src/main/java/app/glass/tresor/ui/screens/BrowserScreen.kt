@@ -1,5 +1,6 @@
 package app.glass.tresor.ui.screens
 
+import app.glass.tresor.ui.TresorTextField
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.net.Uri
@@ -491,14 +492,14 @@ fun BrowserScreen(disguise: Boolean = false) {
                 Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                     val shownText = if (editing) input else if (tab.started) hostOf(tab.url) else ""
                     if (shownText.isEmpty()) Text(if (torMode) "Über Tor suchen oder Adresse" else "Suchen oder Adresse eingeben", style = G.body.copy(fontSize = 16.sp, color = G.faint))
-                    BasicTextField(
+                    TresorTextField(
                         value = shownText,
                         onValueChange = { input = it; editing = true },
                         singleLine = true,
                         textStyle = G.body.copy(fontSize = 16.sp, fontWeight = if (editing) FontWeight.Normal else FontWeight.Medium),
-                        cursorBrush = SolidColor(G.accentText),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go, autoCorrectEnabled = false),
                         keyboardActions = KeyboardActions(onGo = { go(input) }, onDone = { go(input) }, onSearch = { go(input) }),
+                        actionLabel = "Los", onAction = { go(input) }, own = !disguise,
                         modifier = Modifier.fillMaxWidth()
                             .focusRequester(fieldFocus)
                             .onFocusChanged {

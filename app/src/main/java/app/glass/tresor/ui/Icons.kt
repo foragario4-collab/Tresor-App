@@ -103,4 +103,13 @@ object Ic {
     val flake = stroke("flake", "M12 2.5v19 M3.8 7.25l16.4 9.5 M20.2 7.25L3.8 16.75 M9.6 3.9L12 5.4l2.4-1.5 M9.6 20.1L12 18.6l2.4 1.5 M4.2 10l2.4-.3-.9-2.3 M19.8 14l-2.4.3.9 2.3 M19.8 10l-2.4-.3.9-2.3 M4.2 14l2.4.3-.9 2.3")
     val star = stroke("star", "M12 3.2l2.7 5.6 6.1.8-4.5 4.2 1.1 6.1L12 17l-5.4 2.9 1.1-6.1-4.5-4.2 6.1-.8z")
     val voicemail = stroke("voicemail", "M6.5 15.5a3.5 3.5 0 1 0 0-7a3.5 3.5 0 1 0 0 7z M17.5 15.5a3.5 3.5 0 1 0 0-7a3.5 3.5 0 1 0 0 7z M6.5 15.5h11")
+    // Eigene Tastatur
+    val shift = stroke("shift", "M12 4l8 8h-4v7H8v-7H4z")
+    val shiftOn = filled("shiftOn", "M12 3.2l8.8 8.8h-4.3v7.5h-9v-7.5H3.2z")
+    val emoji = stroke("emoji", "M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0 -18z M8.5 14a4 4 0 0 0 7 0 M9 9.5h.01 M15 9.5h.01")
+    // Kontrollzentrum
+    val tor = stroke("tor", "M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0 -18z M12 7a5 5 0 1 0 0 10 M12 11a1 1 0 1 0 0 2")
+    val motion = stroke("motion", "M4 12h3l3 -7l4 14l3 -7h3")
+    val flip = stroke("flip", "M7 4h10v16H7z M10 17h4")
+    val sliders = stroke("sliders", "M4 7h9 M17 7h3 M15 5v4 M4 17h3 M11 17h9 M9 15v4")
 }

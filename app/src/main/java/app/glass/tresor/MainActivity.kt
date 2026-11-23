@@ -44,6 +44,10 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -139,6 +143,7 @@ class MainActivity : FragmentActivity() {
     }
 }
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun Root() {
     val activity = LocalContext.current as FragmentActivity
@@ -179,7 +184,14 @@ private fun Root() {
         return
     }
 
+    // Tresor-Tastatur offen → der Inhalt rückt darüber (wie bei der System-Tastatur), Navigationsleiste übernimmt die Tastatur
+    val kbOpen = app.glass.tresor.ui.TresorKb.active != null
     Box(Modifier.fillMaxSize().background(G.bg)) {
+    androidx.compose.foundation.layout.Column(Modifier.fillMaxSize()) {
+    Box(
+        Modifier.weight(1f).fillMaxWidth()
+            .then(if (kbOpen) Modifier.consumeWindowInsets(WindowInsets.navigationBars) else Modifier)
+    ) {
         AnimatedContent(
             targetState = nav.top,
             transitionSpec = {
@@ -228,8 +240,11 @@ private fun Root() {
         }
         app.glass.tresor.ui.screens.ChatBanner(Modifier.align(Alignment.TopCenter))
         app.glass.tresor.ui.screens.MiniPlayer(Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 112.dp))
-        app.glass.tresor.ui.screens.CallOverlay()
         Toast(Modifier.align(Alignment.BottomCenter))
+    }
+    app.glass.tresor.ui.TresorKeyboardHost()
+    }
+        app.glass.tresor.ui.screens.CallOverlay()
     }
 }
 

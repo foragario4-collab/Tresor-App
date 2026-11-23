@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -168,11 +169,6 @@ fun BoxScope.Sheet(visible: Boolean, onDismiss: () -> Unit, content: @Composable
     if (visible) BackHandler { onDismiss() }
 }
 
-/** Welches Passwortfeld gerade die eigene Tastatur zeigt (immer nur eines). */
-object SecureKbState {
-    var active by mutableStateOf<Any?>(null)
-}
-
 @Composable
 fun GlassField(
     value: String,
@@ -187,36 +183,26 @@ fun GlassField(
 ) {
     var show by remember { mutableStateOf(false) }
     val fr = remember { FocusRequester() }
-    // Codes und Passwörter über die eigene Tastatur: keine fremde Tastatur-App kann mitlesen
-    val secure = password && App.prefs.getBoolean("secureKb", true)
-    val myId = remember { Any() }
-    if (autoFocus) LaunchedEffect(Unit) {
-        if (secure) SecureKbState.active = myId
-        else try { fr.requestFocus() } catch (_: Exception) {}
-    }
-    val kbOpen = secure && SecureKbState.active === myId
-    Column(modifier.fillMaxWidth()) {
+    var focused by remember { mutableStateOf(false) }
+    if (autoFocus) LaunchedEffect(Unit) { try { fr.requestFocus() } catch (_: Exception) {} }
     Row(
-        Modifier
+        modifier
             .fillMaxWidth()
-            .height(54.dp)
-            .clip(Pill)
-            .background(Color.White.copy(alpha = if (kbOpen) 0.13f else 0.09f))
-            .border(1.dp, if (kbOpen) G.accentText.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.16f), Pill)
-            .then(if (secure) Modifier.pressable(Pill, haptic = Haptic.NONE, scaleTo = 1f, highlight = 0f) { SecureKbState.active = myId } else Modifier)
-            .padding(start = 20.dp, end = 8.dp),
+            .then(if (singleLine) Modifier.height(54.dp) else Modifier.heightIn(min = 54.dp))
+            .clip(if (singleLine) Pill else sq(22))
+            .background(Color.White.copy(alpha = if (focused) 0.13f else 0.09f))
+            .border(1.dp, if (focused) G.accentText.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.16f), if (singleLine) Pill else sq(22))
+            .padding(start = 20.dp, end = 8.dp, top = if (singleLine) 0.dp else 14.dp, bottom = if (singleLine) 0.dp else 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(Modifier.weight(1f)) {
-            if (value.isEmpty()) Text(placeholder, style = G.body.copy(color = G.faint))
-            if (secure) {
-                Text(if (show) value else "•".repeat(value.length), style = G.body, maxLines = 1)
-            } else BasicTextField(
+            if (value.isEmpty()) Text(placeholder, style = G.body.copy(color = G.faint), maxLines = 1)
+            // Eingabe über die Tresor-Tastatur (wenn eingeschaltet) – keine fremde Tastatur-App liest mit
+            TresorTextField(
                 value = value,
                 onValueChange = onChange,
                 singleLine = singleLine,
                 textStyle = G.body,
-                cursorBrush = SolidColor(G.accentText),
                 visualTransformation = if (password && !show) PasswordVisualTransformation() else VisualTransformation.None,
                 keyboardOptions = KeyboardOptions(
                     keyboardType = when {
@@ -227,7 +213,8 @@ fun GlassField(
                     imeAction = ImeAction.Done,
                     autoCorrectEnabled = !password && !numeric
                 ),
-                keyboardActions = KeyboardActions(onDone = { onDone?.invoke() }),
+                onAction = onDone,
+                onFocusChanged = { focused = it },
                 modifier = Modifier.fillMaxWidth().focusRequester(fr)
             )
         }
@@ -238,115 +225,6 @@ fun GlassField(
             ) {
                 Icon(if (show) Ic.eyeOff else Ic.eye, if (show) "Verbergen" else "Anzeigen", tint = G.dim, modifier = Modifier.size(20.dp))
             }
-        }
-    }
-    if (kbOpen) {
-        Spacer(Modifier.height(8.dp))
-        SecureKeyboard(
-            numeric = numeric,
-            onKey = { c -> if (value.length < 64) onChange(value + c) },
-            onDelete = { if (value.isNotEmpty()) onChange(value.dropLast(1)) },
-            onDone = { SecureKbState.active = null; onDone?.invoke() }
-        )
-    }
-    }
-}
-
-/** Eingebaute Tastatur für Codes und Passwörter (QWERTZ, Zeichen, Ziffern wie am Telefon). */
-@Composable
-fun SecureKeyboard(numeric: Boolean, onKey: (Char) -> Unit, onDelete: () -> Unit, onDone: () -> Unit) {
-    if (numeric) {
-        // Ziffernblock: 3 gleich breite Spalten, 0 genau unter der 8
-        Column(
-            Modifier.fillMaxWidth().clip(sq(20)).background(Color.White.copy(alpha = 0.06f)).padding(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            val letters = listOf("", "ABC", "DEF", "GHI", "JKL", "MNO", "PQRS", "TUV", "WXYZ")
-            for (r in 0 until 3) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    for (c in 1..3) {
-                        val d = r * 3 + c
-                        NumKey(d.toString(), letters[d - 1], Modifier.weight(1f)) { onKey(('0' + d)) }
-                    }
-                }
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                NumKey("OK", "", Modifier.weight(1f), accent = true) { onDone() }
-                NumKey("0", "", Modifier.weight(1f)) { onKey('0') }
-                NumKey("⌫", "", Modifier.weight(1f), dark = true) { onDelete() }
-            }
-        }
-        return
-    }
-    var mode by remember { mutableStateOf(0) } // 0 = Buchstaben, 1 = Zeichen
-    var shift by remember { mutableStateOf(false) }
-    val rows: List<String> = when (mode) {
-        0 -> listOf("qwertzuiopü", "asdfghjklöä", "yxcvbnm")
-        else -> listOf("1234567890", "-/:;()€&@\"", ".,?!'_%*+=")
-    }
-    Column(
-        Modifier.fillMaxWidth().clip(sq(18)).background(Color.White.copy(alpha = 0.06f)).padding(6.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        rows.forEachIndexed { ri, row ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                if (mode == 0 && ri == 2) KbKey(if (shift) "⇧" else "⇪", Modifier.weight(1.5f), dark = true) { shift = !shift }
-                row.forEach { ch ->
-                    val c = if (mode == 0 && shift) ch.uppercaseChar() else ch
-                    KbKey(c.toString(), Modifier.weight(1f)) { onKey(c); if (shift) shift = false }
-                }
-                if (mode == 0 && ri == 2) KbKey("⌫", Modifier.weight(1.5f), dark = true) { onDelete() }
-            }
-        }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-            KbKey(if (mode == 0) "123" else "ABC", Modifier.weight(1.4f), dark = true) { mode = if (mode == 0) 1 else 0 }
-            KbKey("Leertaste", Modifier.weight(4f)) { onKey(' ') }
-            if (mode != 0) KbKey("⌫", Modifier.weight(1.2f), dark = true) { onDelete() }
-            KbKey("OK", Modifier.weight(1.4f), accent = true) { onDone() }
-        }
-    }
-}
-
-@Composable
-private fun KbKey(label: String, modifier: Modifier, dark: Boolean = false, accent: Boolean = false, onClick: () -> Unit) {
-    Box(
-        modifier
-            .height(44.dp)
-            .pressable(sq(10), scaleTo = 0.92f, highlight = 0.12f, haptic = Haptic.TICK) { onClick() }
-            .clip(sq(10))
-            .background(
-                when {
-                    accent -> G.accent
-                    dark -> Color.White.copy(alpha = 0.10f)
-                    else -> Color.White.copy(alpha = 0.18f)
-                }
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(label, style = G.body.copy(fontSize = if (label.length > 3) 14.sp else 18.sp, color = Color.White), maxLines = 1)
-    }
-}
-
-/** Taste im Ziffernblock: große Ziffer, darunter die Buchstaben wie am Telefon. */
-@Composable
-private fun NumKey(label: String, sub: String, modifier: Modifier, dark: Boolean = false, accent: Boolean = false, onClick: () -> Unit) {
-    Box(
-        modifier
-            .height(54.dp)
-            .pressable(sq(14), scaleTo = 0.93f, highlight = 0.14f, haptic = Haptic.TICK) { onClick() }
-            .clip(sq(14))
-            .background(
-                when {
-                    accent -> G.accent
-                    dark -> Color.White.copy(alpha = 0.09f)
-                    else -> Color.White.copy(alpha = 0.17f)
-                }
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(label, style = G.body.copy(fontSize = if (label.length > 1) 17.sp else 24.sp, fontWeight = if (accent) FontWeight.SemiBold else FontWeight.Normal, color = Color.White), maxLines = 1)
-            if (sub.isNotEmpty()) Text(sub, style = G.footnote.copy(fontSize = 9.sp, letterSpacing = 1.5.sp, color = Color.White.copy(alpha = 0.6f)), maxLines = 1)
         }
     }
 }
