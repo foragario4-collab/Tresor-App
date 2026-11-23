@@ -356,7 +356,7 @@ private fun NumKey(label: String, sub: String, modifier: Modifier, dark: Boolean
  * [left] = Taste unten links (z. B. Fingerabdruck), sonst leer.
  */
 @Composable
-fun PinPad(
+fun CodePad(
     code: String,
     onChange: (String) -> Unit,
     maxLen: Int = 12,

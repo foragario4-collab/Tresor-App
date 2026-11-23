@@ -91,6 +91,7 @@ fun PinPad(
     maxLen: Int = 12,
     showBio: Boolean = false,
     onBio: () -> Unit = {},
+    showClock: Boolean = false,
     onConfirm: () -> Unit,
 ) {
     val shake = remember { Animatable(0f) }
@@ -102,15 +103,43 @@ fun PinPad(
         Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(Modifier.height(64.dp))
-        Box(Modifier.size(64.dp).glass(CircleShape), contentAlignment = Alignment.Center) {
-            Icon(Ic.lock, null, tint = Color.White, modifier = Modifier.size(28.dp))
+        // Tastengröße passt sich der Bildschirmhöhe an – nichts wird abgeschnitten
+        val hDp = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp
+        val key = when { hDp >= 820 -> 78.dp; hDp >= 720 -> 70.dp; else -> 62.dp }
+        if (showClock) {
+            // Wie der Sperrbildschirm am iPhone: Schloss, Datum, große Uhrzeit
+            val now by androidx.compose.runtime.produceState(System.currentTimeMillis()) {
+                while (true) { value = System.currentTimeMillis(); delay(10_000) }
+            }
+            val cal = java.util.Calendar.getInstance().apply { timeInMillis = now }
+            Spacer(Modifier.height(if (hDp >= 760) 40.dp else 18.dp))
+            Box(Modifier.size(50.dp).glass(CircleShape), contentAlignment = Alignment.Center) {
+                Icon(Ic.lock, null, tint = Color.White, modifier = Modifier.size(22.dp))
+            }
+            Spacer(Modifier.height(12.dp))
+            Text(
+                "${WEEKDAYS[cal.get(java.util.Calendar.DAY_OF_WEEK) - 1]}, ${cal.get(java.util.Calendar.DAY_OF_MONTH)}. ${MONTHS[cal.get(java.util.Calendar.MONTH)]}",
+                style = G.callout.copy(color = Color.White.copy(alpha = 0.85f), fontWeight = FontWeight.Medium)
+            )
+            Text(
+                "%02d:%02d".format(cal.get(java.util.Calendar.HOUR_OF_DAY), cal.get(java.util.Calendar.MINUTE)),
+                style = G.body.copy(fontSize = if (hDp >= 760) 80.sp else 64.sp, fontWeight = FontWeight.Light, color = Color.White, letterSpacing = (-2).sp, lineHeight = if (hDp >= 760) 84.sp else 68.sp)
+            )
+            Spacer(Modifier.height(14.dp))
+            Text(title, style = G.headline.copy(fontSize = 16.sp, color = Color.White))
+            Spacer(Modifier.height(4.dp))
+            Text(subtitle, style = G.footnote.copy(color = Color.White.copy(alpha = 0.75f)), textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 32.dp))
+        } else {
+            Spacer(Modifier.height(64.dp))
+            Box(Modifier.size(64.dp).glass(CircleShape), contentAlignment = Alignment.Center) {
+                Icon(Ic.lock, null, tint = Color.White, modifier = Modifier.size(28.dp))
+            }
+            Spacer(Modifier.height(18.dp))
+            Text(title, style = G.title2)
+            Spacer(Modifier.height(6.dp))
+            Text(subtitle, style = G.callout.copy(color = G.dim), textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 32.dp))
         }
-        Spacer(Modifier.height(18.dp))
-        Text(title, style = G.title2)
-        Spacer(Modifier.height(6.dp))
-        Text(subtitle, style = G.callout.copy(color = G.dim), textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 32.dp))
-        Spacer(Modifier.height(28.dp))
+        Spacer(Modifier.height(if (showClock) 18.dp else 28.dp))
         Row(
             Modifier.height(16.dp).offset { IntOffset(shake.value.roundToInt(), 0) },
             horizontalArrangement = Arrangement.spacedBy(14.dp),
@@ -121,29 +150,37 @@ fun PinPad(
         }
         Spacer(Modifier.weight(1f))
         val rows = listOf(listOf("1", "2", "3"), listOf("4", "5", "6"), listOf("7", "8", "9"), listOf("bio", "0", "del"))
-        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        val letters = mapOf("2" to "ABC", "3" to "DEF", "4" to "GHI", "5" to "JKL", "6" to "MNO", "7" to "PQRS", "8" to "TUV", "9" to "WXYZ")
+        Column(verticalArrangement = Arrangement.spacedBy(if (key >= 78.dp) 16.dp else 12.dp)) {
             for (r in rows) {
-                Row(horizontalArrangement = Arrangement.spacedBy(26.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(if (key >= 78.dp) 26.dp else 22.dp)) {
                     for (k in r) {
                         when (k) {
                             "bio" -> if (showBio) {
-                                GlassIconButton(Ic.fingerprint, "Systemsperre", size = 78.dp, iconSize = 30.dp, fill = Color.Transparent, onClick = onBio)
-                            } else Spacer(Modifier.size(78.dp))
+                                GlassIconButton(Ic.fingerprint, "Systemsperre", size = key, iconSize = 30.dp, fill = Color.Transparent, onClick = onBio)
+                            } else Spacer(Modifier.size(key))
                             "del" -> Box(
-                                Modifier.size(78.dp).pressable(CircleShape, scaleTo = 0.9f, haptic = Haptic.KEY) {
+                                Modifier.size(key).pressable(CircleShape, scaleTo = 0.9f, haptic = Haptic.KEY) {
                                     if (pin.isNotEmpty()) onPin(pin.dropLast(1))
                                 },
                                 contentAlignment = Alignment.Center
-                            ) { Icon(Ic.backspace, "Löschen", tint = Color.White, modifier = Modifier.size(28.dp)) }
+                            ) {
+                                if (pin.isNotEmpty()) Text("Löschen", style = G.callout.copy(color = Color.White, fontWeight = FontWeight.Medium))
+                            }
                             else -> Box(
                                 Modifier
-                                    .size(78.dp)
+                                    .size(key)
                                     .pressable(CircleShape, scaleTo = 0.9f, highlight = 0.2f, haptic = Haptic.KEY, enabled = !busy) {
                                         if (pin.length < maxLen) onPin(pin + k)
                                     }
                                     .glass(CircleShape),
                                 contentAlignment = Alignment.Center
-                            ) { Text(k, style = G.body.copy(fontSize = 32.sp, fontWeight = FontWeight.Normal)) }
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(k, style = G.body.copy(fontSize = if (key >= 70.dp) 32.sp else 28.sp, fontWeight = FontWeight.Normal, lineHeight = 34.sp))
+                                    Text(letters[k] ?: "", style = G.caption.copy(fontSize = 9.sp, letterSpacing = 1.8.sp, fontWeight = FontWeight.SemiBold, color = Color.White.copy(alpha = 0.7f)))
+                                }
+                            }
                         }
                     }
                 }
@@ -200,7 +237,8 @@ fun LockScreen(asRoot: Boolean = false) {
         }, onFail = {})
     }
 
-    GlassBackground(lockBlobs) {
+    Box(Modifier.fillMaxSize().background(WALL)) {
+        Wallpaper()
         val sub = when {
             lockout > 0 -> "Zu viele Versuche. Warte ${(lockout / 1000) + 1} s."
             App.failedCount() > 0 -> "Falscher Code"
@@ -216,6 +254,7 @@ fun LockScreen(asRoot: Boolean = false) {
             confirmLabel = "Entsperren",
             showBio = bio,
             onBio = { tryBio() },
+            showClock = true,
             onConfirm = {
                 busy = true
                 scope.launch {

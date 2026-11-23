@@ -224,7 +224,7 @@ private fun Root() {
             }
         }
         app.glass.tresor.ui.screens.ChatBanner(Modifier.align(Alignment.TopCenter))
-        app.glass.tresor.ui.screens.MiniPlayer(Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 96.dp))
+        app.glass.tresor.ui.screens.MiniPlayer(Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 112.dp))
         app.glass.tresor.ui.screens.CallOverlay()
         Toast(Modifier.align(Alignment.BottomCenter))
     }

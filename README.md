@@ -19,6 +19,15 @@ Die Werte stehen in der separaten Datei `GitHub-Secrets.txt` (nie ins Repo hochl
 Weil jede Version mit demselben Schlüssel signiert ist, lassen sich Updates einfach drüber installieren.
 **Wichtig:** Die App nie deinstallieren, sonst ist der Tresor-Inhalt weg.
 
+## Oberfläche: das „zweite Handy“
+
+Nach dem Entsperren sieht der Tresor aus wie ein eigenes Handy:
+- **Startbildschirm** mit 3D-Symbolen, Uhr-Widget (live), Favoriten-Widget (Kontakte aus dem Chat), Suche und Dock (Telefon, Nachrichten, Kamera, Browser).
+- Symbol einer Kategorie **lange drücken** = eigener Schlüssel (Fotos & Videos, Dateien, Notizen, Musik). Ein kleines Schloss zeigt geschützte Kategorien.
+- Kamera-Symbol: tippen = Foto, lange drücken = Video. Das Schloss oben rechts sperrt sofort.
+- **Sperrbildschirm** wie am iPhone: Datum, große Uhrzeit, runde Glastasten mit Buchstaben, Fingerabdruck unten links.
+- Kalender, Passwörter und Sprachmemo sind als Symbole schon da und kommen mit den nächsten Updates.
+
 ## Erster Start
 
 - Code festlegen (6–12 Ziffern).

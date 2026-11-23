@@ -1,5 +1,16 @@
 package app.glass.tresor.ui.screens
 
+import androidx.compose.foundation.border
+import app.glass.tresor.ui.Sheet
+import app.glass.tresor.ui.SheetHeader
+import app.glass.tresor.ui.PillButton
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.res.painterResource
+import app.glass.tresor.R
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -73,15 +84,22 @@ fun openItem(fid: String, item: Item, filter: ItemType?) {
     }
 }
 
+// ───────────────────────── Startbildschirm: das „zweite Handy“ ─────────────────────────
+
+val WALL = Color(0xFF0B1030)
+val WEEKDAYS = listOf("Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag")
+private val WD_SHORT = listOf("SO", "MO", "DI", "MI", "DO", "FR", "SA")
+val MONTHS = listOf("Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember")
+private val ICON_SHAPE = androidx.compose.foundation.shape.RoundedCornerShape(14.dp)
+
 @Composable
 fun HomeScreen() {
     val vault = App.vault ?: return
     var query by remember { mutableStateOf("") }
+    var searching by remember { mutableStateOf(false) }
+    var soon by remember { mutableStateOf<String?>(null) }
 
     val visible = vault.folders.filter { !it.hidden && it.id in vault.unlockedFolders }
-    fun count(kind: FolderKind, type: ItemType?) = visible.filter { it.kind == kind }
-        .sumOf { f -> vault.itemsOf(f.id).count { type == null || it.type == type } }
-
     val defaultMedia = visible.firstOrNull { it.kind == FolderKind.MEDIA && !it.isProtected }?.id
     var unlockCat by remember { mutableStateOf<Pair<FolderKind, Screen>?>(null) }
     // Kategorie öffnen: geschützter Container → erst entsperren
@@ -91,102 +109,97 @@ fun HomeScreen() {
     fun locked(kind: FolderKind) = !vault.isCategoryOpen(kind)
     fun catSettings(kind: FolderKind) = openCat(kind, Screen.CategorySettings(kind))
     val import = rememberImport(vault, { defaultMedia })
+    fun camera(video: Boolean) {
+        if (defaultMedia == null) { App.toast("Kein offener Foto-Ordner"); return }
+        if (video) import.takeVideo() else import.takePhoto()
+    }
 
-    GlassBackground {
+    // Uhr läuft live mit
+    val now by androidx.compose.runtime.produceState(System.currentTimeMillis()) {
+        while (true) { value = System.currentTimeMillis(); kotlinx.coroutines.delay(10_000) }
+    }
+    val cal = java.util.Calendar.getInstance().apply { timeInMillis = now }
+    val engine = remember(vault) { try { app.glass.tresor.chat.ChatEngine.of(vault) } catch (e: Exception) { null } }
+    val favs = engine?.contacts?.filter { it.accepted && !it.removedByPeer }?.take(2) ?: emptyList()
+
+    Box(Modifier.fillMaxSize().background(WALL)) {
+        Wallpaper()
         Column(
-            Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .statusBarsPadding()
-                .padding(horizontal = 20.dp)
-                .padding(top = 16.dp, bottom = 130.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+            Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(horizontal = 20.dp)
         ) {
-            Row(verticalAlignment = Alignment.Bottom) {
-                Column(Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Ic.lock, null, tint = G.dim, modifier = Modifier.size(14.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("AES-256 verschlüsselt", style = G.footnote.copy(fontWeight = FontWeight.Medium))
-                    }
-                    Text("Tresor", style = G.largeTitle)
-                }
-                GlassIconButton(Ic.settings, "Einstellungen") { App.nav.push(Screen.Settings) }
+            // Oben rechts: sofort sperren
+            Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Spacer(Modifier.weight(1f))
+                GlassIconButton(Ic.lock, "Jetzt sperren") { App.lock() }
             }
-
-            SearchField(query) { query = it }
-            TipCard("home", "Willkommen im Tresor", "Kategorie lange drücken = eigener Schlüssel (PIN, Passwort, Fingerabdruck/Gesicht). Alles weitere erklärt das Handbuch in den Einstellungen.")
-
-            if (query.isNotBlank()) {
-                SearchResults(vault, query)
+            if (searching) {
+                Spacer(Modifier.height(10.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.weight(1f)) { SearchField(query) { query = it } }
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        "Fertig", style = G.body.copy(fontWeight = FontWeight.SemiBold, color = Color.White),
+                        modifier = Modifier.pressable(Pill) { searching = false; query = "" }.padding(horizontal = 6.dp, vertical = 10.dp)
+                    )
+                }
+                Spacer(Modifier.height(14.dp))
+                Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+                    if (query.isNotBlank()) SearchResults(vault, query)
+                    else Text("Fotos, Dateien, Notizen und Musik durchsuchen", style = G.callout.copy(color = G.dim), modifier = Modifier.padding(top = 20.dp).fillMaxWidth())
+                }
             } else {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        CategoryCard(Modifier.weight(1f), Ic.photo, G.blue, "Fotos", count(FolderKind.MEDIA, ItemType.IMAGE), locked(FolderKind.MEDIA), { catSettings(FolderKind.MEDIA) }) {
-                            openCat(FolderKind.MEDIA, Screen.Albums(FolderKind.MEDIA, ItemType.IMAGE))
-                        }
-                        CategoryCard(Modifier.weight(1f), Ic.video, G.purple, "Videos", count(FolderKind.MEDIA, ItemType.VIDEO), locked(FolderKind.MEDIA), { catSettings(FolderKind.MEDIA) }) {
-                            openCat(FolderKind.MEDIA, Screen.Albums(FolderKind.MEDIA, ItemType.VIDEO))
+                Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(top = 6.dp)) {
+                    // Widgets
+                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        ClockWidget(cal, Modifier.weight(1f))
+                        FavWidget(favs, Modifier.weight(1f))
+                    }
+                    Spacer(Modifier.height(20.dp))
+                    TipCard("home2", "Dein zweites Handy", "Symbol lange drücken = eigener Schlüssel für die Kategorie. Das Schloss oben rechts sperrt sofort. Alles weitere: Einstellungen → Handbuch.")
+                    Spacer(Modifier.height(6.dp))
+                    // App-Raster (4 Spalten)
+                    val apps: List<@Composable (Modifier) -> Unit> = listOf(
+                        { m -> AppIcon(R.drawable.ico_fotos, "Fotos", m, locked(FolderKind.MEDIA), onLong = { catSettings(FolderKind.MEDIA) }) { openCat(FolderKind.MEDIA, Screen.Albums(FolderKind.MEDIA, ItemType.IMAGE)) } },
+                        { m -> AppIcon(R.drawable.ico_videos, "Videos", m, locked(FolderKind.MEDIA), onLong = { catSettings(FolderKind.MEDIA) }) { openCat(FolderKind.MEDIA, Screen.Albums(FolderKind.MEDIA, ItemType.VIDEO)) } },
+                        { m -> AppIcon(R.drawable.ico_dateien, "Dateien", m, locked(FolderKind.FILES), onLong = { catSettings(FolderKind.FILES) }) { openCat(FolderKind.FILES, Screen.Albums(FolderKind.FILES, null)) } },
+                        { m -> AppIcon(R.drawable.ico_notizen, "Notizen", m, locked(FolderKind.NOTES), onLong = { catSettings(FolderKind.NOTES) }) { openCat(FolderKind.NOTES, Screen.Albums(FolderKind.NOTES, null)) } },
+                        { m -> AppIcon(R.drawable.ico_musik, "Musik", m, locked(FolderKind.MUSIC), onLong = { catSettings(FolderKind.MUSIC) }) { openCat(FolderKind.MUSIC, Screen.Albums(FolderKind.MUSIC, null)) } },
+                        { m -> AppIcon(R.drawable.ico_kamera, "Kamera", m, onLong = { camera(true) }) { camera(false) } },
+                        { m -> AppIcon(R.drawable.ico_kalender, "Kalender", m, overlay = { CalendarFace(cal) }) { soon = "Kalender" } },
+                        { m -> AppIcon(R.drawable.ico_passwoerter, "Passwörter", m) { soon = "Passwörter" } },
+                        { m -> AppIcon(R.drawable.ico_browser, "Browser", m) { App.nav.push(Screen.Browser) } },
+                        { m -> AppIcon(R.drawable.ico_kontakte, "Kontakte", m) { App.nav.push(Screen.Chat) } },
+                        { m -> AppIcon(R.drawable.ico_sprachmemo, "Sprachmemo", m) { soon = "Sprachmemo" } },
+                        { m -> AppIcon(R.drawable.ico_einstellungen, "Einstellungen", m) { App.nav.push(Screen.Settings) } },
+                    )
+                    apps.chunked(4).forEach { row ->
+                        Row(Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
+                            row.forEach { cell -> cell(Modifier.weight(1f)) }
                         }
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        CategoryCard(Modifier.weight(1f), Ic.folder, G.amber, "Dateien", count(FolderKind.FILES, null), locked(FolderKind.FILES), { catSettings(FolderKind.FILES) }) {
-                            openCat(FolderKind.FILES, Screen.Albums(FolderKind.FILES, null))
-                        }
-                        CategoryCard(Modifier.weight(1f), Ic.note, G.teal, "Notizen", count(FolderKind.NOTES, null), locked(FolderKind.NOTES), { catSettings(FolderKind.NOTES) }) {
-                            openCat(FolderKind.NOTES, Screen.Albums(FolderKind.NOTES, null))
-                        }
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        CategoryCard(Modifier.weight(1f), Ic.music, Color(0xFFE5484D), "Musik", count(FolderKind.MUSIC, null), locked(FolderKind.MUSIC), { catSettings(FolderKind.MUSIC) }) {
-                            openCat(FolderKind.MUSIC, Screen.Albums(FolderKind.MUSIC, null))
-                        }
-                        ToolCard(Modifier.weight(1f), Ic.chat, Color(0xFF30A46C), "Chat", "Über Tor") {
-                            App.nav.push(Screen.Chat)
-                        }
-                    }
-                    ToolCard(Modifier.fillMaxWidth(), Ic.globe, Color(0xFF3E63DD), "Browser", "Ohne Spuren") {
-                        App.nav.push(Screen.Browser)
+                    Spacer(Modifier.height(12.dp))
+                }
+                // Suchen
+                Box(Modifier.fillMaxWidth().padding(bottom = 12.dp), contentAlignment = Alignment.Center) {
+                    Row(
+                        Modifier.pressable(Pill) { searching = true }.glass(Pill).padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Ic.search, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Suchen", style = G.footnote.copy(color = Color.White, fontWeight = FontWeight.Medium))
                     }
                 }
-
-                val recent = vault.recentMedia()
-                if (recent.isNotEmpty()) {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text("Zuletzt hinzugefügt", style = G.title3)
-                        LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            contentPadding = PaddingValues(end = 4.dp)
-                        ) {
-                            items(recent, key = { it.first + it.second.id }) { (fid, item) ->
-                                Box(
-                                    Modifier
-                                        .size(78.dp)
-                                        .pressable(sq(18)) { openItem(fid, item, null) }
-                                ) {
-                                    Thumb(vault, fid, item, Modifier.fillMaxSize().clip(sq(18)))
-                                }
-                            }
-                        }
-                    }
-                }
-
+                // Dock
                 Row(
-                    Modifier.fillMaxWidth().glass(sq(22)).padding(horizontal = 16.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    Modifier.fillMaxWidth().padding(bottom = 12.dp).glass(androidx.compose.foundation.shape.RoundedCornerShape(32.dp))
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Icon(Ic.shield, null, tint = G.mint, modifier = Modifier.size(26.dp))
-                    Spacer(Modifier.width(12.dp))
-                    Column {
-                        Text("Geschützt", style = G.headline.copy(fontSize = 15.sp))
-                        Text(
-                            buildString {
-                                append("Sperre beim Verlassen")
-                                if (App.secure) append(" · Screenshots blockiert")
-                            },
-                            style = G.footnote
-                        )
-                    }
+                    DockIcon(R.drawable.ico_telefon, "Telefon") { App.nav.push(Screen.Chat) }
+                    DockIcon(R.drawable.ico_nachrichten, "Nachrichten") { App.nav.push(Screen.Chat) }
+                    DockIcon(R.drawable.ico_kamera, "Kamera", onLong = { camera(true) }) { camera(false) }
+                    DockIcon(R.drawable.ico_browser, "Browser") { App.nav.push(Screen.Browser) }
                 }
             }
         }
@@ -199,36 +212,139 @@ fun HomeScreen() {
             if (t != null) App.nav.push(t)
         }
 
-        // Untere Leiste
-        Row(
-            Modifier
-                .align(Alignment.BottomCenter)
-                .navigationBarsPadding()
-                .padding(horizontal = 24.dp)
-                .padding(bottom = 18.dp)
-                .fillMaxWidth()
-                .height(66.dp)
-                .glass(Pill, G.fill)
-                .padding(horizontal = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            NavTab(Ic.grid, "Tresor", active = true) {}
-            Box(
-                Modifier
-                    .size(54.dp)
-                    .pressable(CircleShape, scaleTo = 0.9f, highlight = 0f, haptic = Haptic.CONFIRM, onLongClick = {
-                        if (defaultMedia != null) import.takeVideo()
-                    }) {
-                        if (defaultMedia != null) import.takePhoto() else App.toast("Kein offener Foto-Ordner")
-                    }
-                    .clip(CircleShape)
-                    .background(Color.White),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Ic.camera, "Kamera (lange drücken für Video)", tint = Color(0xFF0B0D12), modifier = Modifier.size(24.dp))
+        Sheet(soon != null, { soon = null }) {
+            SheetHeader(Ic.info, soon ?: "", "Diese App kommt mit einem der nächsten Updates – verschlüsselt im Tresor, wie alles hier.")
+            PillButton("Verstanden", primary = true, modifier = Modifier.fillMaxWidth()) { soon = null }
+            Spacer(Modifier.navigationBarsPadding())
+        }
+    }
+}
+
+/** Hintergrund mit weichen Farbflecken (wie im Entwurf „Nacht“). */
+@Composable
+fun Wallpaper() {
+    androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+        val w = size.width; val h = size.height
+        fun blob(c: Color, cx: Float, cy: Float, r: Float, a: Float) = drawCircle(
+            Brush.radialGradient(listOf(c.copy(alpha = a), c.copy(alpha = a * 0.45f), Color.Transparent), center = androidx.compose.ui.geometry.Offset(cx, cy), radius = r),
+            radius = r, center = androidx.compose.ui.geometry.Offset(cx, cy)
+        )
+        blob(Color(0xFF3B4CFF), w * 0.18f, h * 0.15f, w * 0.85f, 0.85f)
+        blob(Color(0xFFB04CFF), w * 0.92f, h * 0.62f, w * 0.80f, 0.75f)
+        blob(Color(0xFF00B3A4), w * 0.48f, h * 0.98f, w * 0.65f, 0.65f)
+    }
+}
+
+@Composable
+private fun ClockWidget(cal: java.util.Calendar, modifier: Modifier) {
+    Column(
+        modifier.height(140.dp).glass(sq(26)).padding(16.dp),
+        verticalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(WEEKDAYS[cal.get(java.util.Calendar.DAY_OF_WEEK) - 1], style = G.footnote.copy(color = Color.White.copy(alpha = 0.85f), fontWeight = FontWeight.SemiBold))
+        Text(
+            "%02d:%02d".format(cal.get(java.util.Calendar.HOUR_OF_DAY), cal.get(java.util.Calendar.MINUTE)),
+            style = G.body.copy(fontSize = 44.sp, fontWeight = FontWeight.Light, color = Color.White, letterSpacing = (-1).sp),
+            maxLines = 1
+        )
+        Text("${cal.get(java.util.Calendar.DAY_OF_MONTH)}. ${MONTHS[cal.get(java.util.Calendar.MONTH)]}", style = G.footnote.copy(color = Color.White.copy(alpha = 0.85f)), maxLines = 1)
+    }
+}
+
+@Composable
+private fun FavWidget(favs: List<app.glass.tresor.chat.Contact>, modifier: Modifier) {
+    Column(
+        modifier.height(140.dp).pressable(sq(26)) { App.nav.push(Screen.Chat) }.glass(sq(26)).padding(14.dp),
+        verticalArrangement = Arrangement.SpaceBetween
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Ic.phone, null, tint = Color.White, modifier = Modifier.size(15.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("Favoriten", style = G.footnote.copy(color = Color.White, fontWeight = FontWeight.SemiBold))
+        }
+        if (favs.isEmpty()) {
+            Text("Noch keine Kontakte", style = G.footnote.copy(color = Color.White.copy(alpha = 0.8f)))
+        } else Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            favs.forEach { c ->
+                Box(
+                    Modifier.size(52.dp).pressable(CircleShape, scaleTo = 0.9f) { App.nav.push(Screen.ChatThread(c.id)) }
+                        .clip(CircleShape).background(avatarColor(c.name)),
+                    contentAlignment = Alignment.Center
+                ) { Text(c.name.take(1).uppercase(), style = G.headline.copy(fontSize = 20.sp, color = Color.White)) }
             }
-            NavTab(Ic.lock, "Sperren", active = false) { App.lock() }
+        }
+        Text("Anruf über Tor", style = G.footnote.copy(fontSize = 12.sp, color = Color.White.copy(alpha = 0.8f)))
+    }
+}
+
+private fun avatarColor(name: String): Color {
+    val colors = listOf(Color(0xFFFF7A59), Color(0xFF3FBF8F), Color(0xFFA77BFF), Color(0xFF5B9CFF), Color(0xFFE0A21B), Color(0xFFFF5E8A))
+    return colors[(name.hashCode() and 0x7fffffff) % colors.size]
+}
+
+/** Live-Datum auf dem Kalender-Symbol (wie beim iPhone). */
+@Composable
+private fun BoxScope.CalendarFace(cal: java.util.Calendar) {
+    Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(WD_SHORT[cal.get(java.util.Calendar.DAY_OF_WEEK) - 1], style = G.caption.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFFFF3B30), letterSpacing = 0.8.sp))
+        Text(
+            "${cal.get(java.util.Calendar.DAY_OF_MONTH)}",
+            style = G.body.copy(fontSize = 30.sp, fontWeight = FontWeight.Light, color = Color(0xFF1C1F26), lineHeight = 32.sp)
+        )
+    }
+}
+
+/** App-Symbol mit Beschriftung. Gesperrte Kategorien zeigen ein kleines Schloss. */
+@Composable
+private fun AppIcon(
+    res: Int, label: String, modifier: Modifier, locked: Boolean = false,
+    overlay: (@Composable BoxScope.() -> Unit)? = null,
+    onLong: (() -> Unit)? = null, onClick: () -> Unit
+) {
+    androidx.compose.foundation.layout.BoxWithConstraints(modifier, contentAlignment = Alignment.TopCenter) {
+        val small = maxWidth < 84.dp
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            IconTile(res, label, locked, overlay, onLong, onClick)
+            Spacer(Modifier.height(6.dp))
+            Text(
+                label,
+                style = G.caption.copy(fontSize = if (small) 10.5.sp else 12.sp, fontWeight = FontWeight.Medium, color = Color.White, letterSpacing = 0.sp),
+                maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 2.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun DockIcon(res: Int, label: String, onLong: (() -> Unit)? = null, onClick: () -> Unit) {
+    IconTile(res, label, false, null, onLong, onClick)
+}
+
+@Composable
+private fun IconTile(
+    res: Int, label: String, locked: Boolean,
+    overlay: (@Composable BoxScope.() -> Unit)?,
+    onLong: (() -> Unit)?, onClick: () -> Unit
+) {
+    Box(
+        Modifier.size(62.dp)
+            .pressable(ICON_SHAPE, scaleTo = 0.9f, highlight = 0.12f, onLongClick = onLong, onClick = onClick)
+            .shadow(10.dp, ICON_SHAPE, clip = false, ambientColor = Color(0xFF050A28), spotColor = Color(0xFF050A28))
+    ) {
+        Image(
+            painterResource(res), label,
+            modifier = Modifier.fillMaxSize().clip(ICON_SHAPE),
+            contentScale = androidx.compose.ui.layout.ContentScale.Fit
+        )
+        overlay?.invoke(this)
+        if (locked) {
+            Box(
+                Modifier.align(Alignment.TopEnd).offset(x = 5.dp, y = (-5).dp).size(22.dp)
+                    .clip(CircleShape).background(Color(0xE60B1030))
+                    .border(1.dp, Color.White.copy(alpha = 0.45f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) { Icon(Ic.lock, "Geschützt", tint = Color.White, modifier = Modifier.size(12.dp)) }
         }
     }
 }

@@ -62,7 +62,7 @@ import app.glass.tresor.ui.GlassField
 import app.glass.tresor.ui.Ic
 import app.glass.tresor.ui.Pill
 import app.glass.tresor.ui.PillButton
-import app.glass.tresor.ui.PinPad
+import app.glass.tresor.ui.CodePad
 import app.glass.tresor.ui.Sheet
 import app.glass.tresor.ui.SheetHeader
 import app.glass.tresor.ui.Thumb
@@ -455,7 +455,7 @@ fun androidx.compose.foundation.layout.BoxScope.FolderCodeSheet(
                     contentAlignment = Alignment.Center
                 ) { Icon(Ic.fingerprint, "Mit Fingerabdruck oder Gesicht", tint = Color.White, modifier = Modifier.size(32.dp)) }
             }
-            PinPad(
+            CodePad(
                 code = code,
                 onChange = { code = it; error = null },
                 error = error != null,
